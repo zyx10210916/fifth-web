@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# 确保 PATH 包含必要的可执行路径
+PATH="/usr/local/bin:$PATH"
+
+# 直接调用 commitlint 检查提交消息
+npx --no-install commitlint --edit "$1"

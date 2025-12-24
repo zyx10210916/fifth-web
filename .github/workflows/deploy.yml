@@ -1,0 +1,57 @@
+name: deploy
+
+on:
+  push:
+    branches: ['main'] # master 分支有 push 时触发
+    paths-ignore: # 下列文件的变更不触发部署，可以自行添加
+      - LICENSE
+      - README.md
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 下载源码
+      # 这一步就是检出你的仓库并下载里面的代码到runner中,actions/checkout@v3是官方自己造的轮子，直接拿来用就行
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      - name: Node 环境
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: 安装pnpm
+        uses: pnpm/action-setup@v2
+        id: pnpm-install
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: 安装依赖
+        if: steps.cache-hit.outputs.cache-hit != 'true'
+        run: pnpm install
+
+      - name: 打包构建
+        run: pnpm run build
+
+      - name: 部署
+        uses: peaceiris/actions-gh-pages@v3 # 使用部署到 GitHub pages 的 action
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # secret 名
+          commit_message: 自动部署 # 部署时的 git 提交信息，自由填写
+          publish_dir: ./dist # 部署打包后的 dist 目录
