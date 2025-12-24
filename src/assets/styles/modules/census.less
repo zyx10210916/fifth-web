@@ -1,0 +1,293 @@
+// 主页面样式
+.census-container {
+  display: flex;
+  height: 100vh;
+  background-color: #f5f5f5;
+
+  .main-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+
+    .side-menu {
+      width: 64px;
+      background: #001529;
+      padding-top: 16px;
+
+      .menu-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 0;
+        cursor: pointer;
+        color: rgb(255 255 255 / 65%);
+        transition: all 0.3s;
+
+        :deep(.anticon) {
+          font-size: 18px;
+        }
+
+        span {
+          margin-top: 4px;
+          font-size: 12px;
+        }
+
+        &:hover,
+        &.active {
+          color: #fff;
+        }
+      }
+    }
+
+    .content-area {
+      flex: 1;
+      padding: 16px;
+      overflow: hidden;
+      .top-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        background: #f5f5f5;
+        border-radius: 2px;
+        margin-bottom: 16px;
+        height: 5vh;
+
+        .left {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          img {
+            width: 33px;
+            height: 33px;
+            border-radius: 4px;
+            color: white;
+          }
+
+          .page-title {
+            font-size: 16px;
+            font-weight: 500;
+            color: rgb(0 0 0 / 85%);
+          }
+        }
+
+        .right {
+          :deep(.icon-btn) {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            background-color: black;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &:hover {
+              background-color: #4058cc;
+            }
+
+            .anticon {
+              font-size: 16px;
+            }
+          }
+
+          .user-info {
+            border-radius: 20px;
+            padding: 10px;
+            cursor: pointer;
+            height: 32px;
+            width: auto;
+            display: flex;
+            align-items: center;
+            background-color: #546fff;
+
+            &:hover {
+              opacity: 0.8;
+            }
+          }
+        }
+      }
+
+      .setion{
+          .custom-tabs {
+            padding: 0 16px;
+            border-radius: 18px 18px 0 0;
+            border-bottom: 1px solid #f0f0f0;
+            background-color: #fff;
+          height: 5vh;
+          }
+
+      }
+
+      
+    }
+  }
+}
+
+// Tabs 全局样式
+:deep(.ant-tabs-nav::before) {
+  border-bottom: none !important;
+}
+
+:deep(.ant-tabs-nav) {
+  margin-bottom: 0 !important;
+
+  .ant-tabs-tab {
+    color: rgb(113 113 113 / 100%);
+
+    &.ant-tabs-tab-active {
+      .ant-tabs-tab-btn {
+        color: #546fff !important;
+      }
+    }
+  }
+
+  .ant-tabs-ink-bar {
+    background: #546fff;
+  }
+}
+
+// 数据查询表格组件样式
+.search-section {
+  background: white;
+  border-radius: 18px;
+  margin-bottom: 16px;
+  flex: 1;
+  flex-direction: column;
+  display: flex;
+
+  .search-form {
+    padding: 16px;
+    margin-bottom: 12px;
+    background-color: white;
+    border-radius: 0 0 18px 18px;
+
+    :deep(.ant-form-item-label) {
+      label {
+        color: rgb(113 113 113 / 100%);
+        font-size: 1.6rem;
+      }
+    }
+
+    :deep(.custom-input) {
+      border-radius: 18px;
+      background: rgb(245 245 245 / 100%);
+      border: none;
+
+      &:hover,
+      &:focus {
+        background: rgb(245 245 245 / 100%);
+        box-shadow: none;
+      }
+
+      input {
+        background: transparent;
+
+        &::placeholder {
+          color: rgb(0 0 0 / 85%);
+        }
+      }
+    }
+
+    :deep(.custom-select) {
+      .ant-select-selector {
+        border-radius: 18px;
+        background: rgb(245 245 245 / 100%);
+        border: none;
+
+        .ant-select-selection-placeholder {
+          color: rgb(0 0 0 / 85%);
+        }
+      }
+
+      &:hover .ant-select-selector {
+        background: rgb(245 245 245 / 100%);
+        box-shadow: none;
+      }
+    }
+
+    :deep(.search-btn) {
+      background: #546fff;
+      border-radius: 18px;
+      border: none;
+      height: 32px;
+      padding: 0 16px;
+
+      &:hover {
+        background: #4058cc;
+      }
+    }
+
+    :deep(.reset-btn) {
+      border-radius: 18px;
+      border: 1px solid #d9d9d9;
+      height: 32px;
+      padding: 0 16px;
+      color: rgb(113 113 113 / 100%);
+
+      &:hover {
+        color: #546fff;
+        border-color: #546fff;
+      }
+    }
+  }
+}
+
+.custom-table {
+  background: white;
+  border-radius: 18px;
+  padding: 16px;
+
+  :deep(.ant-table-thead > tr) {
+    height: 36px;
+
+    > th {
+      background: rgb(245 245 245 / 100%);
+      font-weight: normal;
+      color: black;
+      font-size: 14px;
+      text-align: center;
+      height: 36px;
+      padding: 0;
+    }
+  }
+
+  :deep(.ant-table-tbody > tr) {
+    height: 36px;
+
+    > td {
+      height: 36px;
+      padding: 0;
+      line-height: 36px;
+      text-align: center;
+      font-size: 14px;
+
+      // 除了模板描述和操作列，其他列的字体颜色
+      &:not(:nth-child(3)):not(:last-child) {
+        color: rgb(90 96 107 / 100%);
+      }
+
+      // 模板描述列的样式
+      &:nth-child(3) {
+        color: rgb(84 111 255 / 100%);
+        cursor: pointer;
+      }
+    }
+  }
+}
+
+.description-link {
+  cursor: pointer;
+  color: rgb(84 111 255 / 100%);
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.ellipsis{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

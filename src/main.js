@@ -1,0 +1,20 @@
+import App from './App.vue';
+import { createApp } from 'vue';
+import router from './router';
+import piniaStore from './store';
+import '@/styles/index.less';
+import '@/styles/reset.less';
+import 'virtual:svg-icons-register';
+import '@arco-design/web-vue/dist/arco.css';
+import 'virtual:uno.css';
+import '@/styles/index.less';
+import 'vue-devui/style.css';
+import '@devui-design/icons/icomoon/devui-icon.css';
+import { ThemeServiceInit, devuiDarkTheme } from 'devui-theme';
+const themeService = ThemeServiceInit({ devuiDarkTheme }, 'infinityTheme');
+themeService?.applyTheme(devuiDarkTheme);
+const app = createApp(App);
+app.use(router);
+app.use(piniaStore);
+app.mount('#app');
+//# sourceMappingURL=main.js.map

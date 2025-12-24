@@ -1,0 +1,117 @@
+.search-header {
+  background: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+
+  .search-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    // gap: 16px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .search-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      span {
+        // color: rgb(113 113 113 / 100%);
+        white-space: nowrap;
+        font-size: 1.6rem;
+        line-height: 1.6rem;
+      }
+    }
+  }
+
+  :deep(.ant-select) {
+    .ant-select-selector {
+      border-radius: 85px;
+      height: 32px;
+      background: rgb(245 245 247 / 100%) !important;
+      border: none;
+
+      .ant-select-selection-item {
+        color: rgb(55 55 55 / 100%);
+        font-size: 14px;
+        line-height: 30px;
+      }
+
+      .ant-select-selection-placeholder {
+        font-size: 14px;
+        line-height: 30px;
+      }
+
+      &:hover,
+      &:focus {
+        background: rgb(245 245 247 / 100%) !important;
+        box-shadow: none;
+      }
+    }
+
+    &.ant-select-focused .ant-select-selector {
+      box-shadow: none !important;
+    }
+  }
+
+  .add-condition-btn {
+    background: #fff;
+    border: 1px dashed #d9d9d9;
+    color: rgb(0 0 0 / 85%);
+    border-radius: 85px;
+    padding: 0 16px;
+    height: 32px;
+    line-height: 32px;
+    font-size: 14px;
+
+    &:hover {
+      color: #546fff;
+      border-color: #546fff;
+    }
+  }
+
+  .link-btn {
+    color: rgb(113 113 113 / 100%);
+    padding: 0;
+    height: auto;
+    font-size: 14px;
+
+    &:hover {
+      color: #546fff;
+    }
+  }
+
+  :deep(.ant-btn) {
+    font-size: 1.4rem;
+    border-radius: 4px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+  }
+
+  :deep(.ant-input) {
+    border-radius: 85px;
+    background: rgb(245 245 247 / 100%);
+    border: none;
+    height: 32px;
+    font-size: 14px;
+    color: rgb(55 55 55 / 100%);
+
+    &:hover,
+    &:focus {
+      background: rgb(245 245 247 / 100%);
+      box-shadow: none;
+    }
+
+    &::placeholder {
+      // color: rgb(55 55 55 / 100%);
+      color: rgb(55 55 55 / 100%) !important;
+      font-size: 13px;
+    }
+  }
+}
