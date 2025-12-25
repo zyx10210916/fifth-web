@@ -1,13 +1,13 @@
 <template>
   <div class="left">
-    <!-- 法人单位数量卡片 - 修改后的结构 -->
+    <!-- 法人单位数量卡片 -->
     <div class="item-box corporate-box" cid="ItemBox">
       <div class="head">
         法人单位数量
         <div class="right"></div>
       </div>
       <div class="content">
-         <!-- 完全复制原本的SVG结构 -->
+         <!-- 复现原本的SVG结构 -->
         <svg 
           data-v-9dada9bc 
           data-v-e868fad4 
@@ -77,7 +77,7 @@
         从业人员期末人数，总计：{{ (totalPersonnel / 10000).toFixed(2) }}万 
       </div>
       <div class="content flex-content">
-        <div ref="donutChartRef" class="chart-container"></div>
+        <div ref="personnelChartRef" class="chart-container"></div>
       </div>
     </div>
  
@@ -87,7 +87,7 @@
         营业收入，总计：{{ (totalEconomic / 10000).toFixed(2) }}万元
       </div>
       <div class="content flex-content">
-        <div ref="donutChart2Ref" class="chart-container"></div>
+        <div ref="revenueChartRef" class="chart-container"></div>
       </div>
     </div>
   </div>
@@ -97,162 +97,190 @@
 import * as echarts from 'echarts';
 import { ref, watch, onMounted } from 'vue';
 
+// 1. 接收父组件传来的数据 (此时 props.summaryData 对应的是后端返回的 data 对象)
 const props = defineProps({
-  summaryData: { type: Array, default: () => [] }
+  summaryData: { type: Object, default: () => ({}) }
 });
 
-const donutChartRef = ref<HTMLElement | null>(null);
-const donutChart2Ref = ref<HTMLElement | null>(null);
+const personnelChartRef = ref<HTMLElement | null>(null);
+const revenueChartRef = ref<HTMLElement | null>(null);
 let chart1: echarts.ECharts | null = null;
 let chart2: echarts.ECharts | null = null;
 
+// UI 绑定变量
 const totalCorporateCount = ref(0);
 const totalPersonnel = ref(0);
 const totalEconomic = ref(0);
 
-// --- 颜色对应关系 (精准匹配参考图) ---
-const scaleMap: any = { "1": "大型", "2": "中型", "3": "小型", "4": "微型", "": "其他", null: "其他" };
+// 颜色映射表
 const colorMap: any = {
-  "大型": "#5470c6", // 深蓝色
-  "中型": "#91cc75", // 绿色
-  "小型": "#fac858", // 黄色/橙色
-  "微型": "#ee6666", // 红色
-  "其他": "#73c0de"  // 天蓝色
+  "大型": "#5470c6",
+  "中型": "#91cc75",
+  "小型": "#fac858",
+  "微型": "#ee6666",
+  "未知": "#73c0de"
 };
 
-const getBasicOption = (title: string): any => ({
-  // 图例配置
+// ECharts 基础配置
+const getCommonOption = () => ({
   legend: {
     orient: 'vertical',
-    right: '5%',
+    right: '2%',      // 图例靠右
     top: 'center',
     itemWidth: 10,
     itemHeight: 10,
-    textStyle: { color: '#666', fontSize: 12 }
+    textStyle: { color: '#666', fontSize: 16 }
   },
   tooltip: {
     trigger: 'item',
     backgroundColor: 'rgba(50, 50, 50, 0.7)',
     borderWidth: 0,
     textStyle: { color: '#fff' },
-    formatter: (params: any) => {
-      return `<span style="display:inline-block;margin-right:5px;border-radius:10px;width:10px;height:10px;background-color:${params.color};"></span>${params.name}: ${params.value.toFixed(2)}`;
-    }
+    formatter: (p: any) => `<span style="display:inline-block;margin-right:5px;border-radius:50%;width:10px;height:10px;background-color:${p.color};"></span>${p.name}: ${p.value}`
   },
   series: [{
     type: 'pie',
-    radius: ['55%', '80%'],
-    center: ['40%', '50%'], // 向左偏移，给右侧图例留位置
+    radius: ['40%', '80%'],
+    center: ['40%', '50%'], // 图表左移给图例留位
     avoidLabelOverlap: false,
-    itemStyle: { borderColor: '#fff', borderWidth: 2 },
-    label: {
-      show: false,
-      position: 'center',
-      formatter: '{b}', // 悬浮时显示的文字格式
-      fontSize: 16,
-      fontWeight: 'bold'
-    },
+    itemStyle: { borderRadius: 0, borderColor: '#fff', borderWidth: 2 },
+    label: { show: false, position: 'center', formatter: '{b}', fontSize: 20, fontWeight: 'bold' },
     emphasis: {
-      label: {
-        show: true, // 鼠标悬浮时在中间显示文字
-        fontSize: 18,
-        color: 'inherit' // 颜色跟随当前扇区
-      }
+      label: { show: true, fontSize: 20, fontWeight: 'bold', color: 'inherit' }
     },
-    labelLine: { show: false },
     data: []
   }]
 });
 
+// 核心数据处理逻辑
 const processData = () => {
-  if (!props.summaryData.length) return;
+  const res = props.summaryData;
+  if (!res || Object.keys(res).length === 0) return;
 
-  let cSum = 0, pSum = 0, eSum = 0;
-  // 初始化各个分类的数据，保证图例顺序一致
-  const categories = ["大型", "中型", "小型", "微型", "其他"];
-  const pMap: any = {}; const eMap: any = {};
-  categories.forEach(cat => { pMap[cat] = 0; eMap[cat] = 0; });
+  // --- 关键：处理法人单位数量 ---
+  // 直接从对象属性读取，确保能拿到 866500 这个值
+  totalCorporateCount.value = res.legalPersonNum || 0;
 
-  props.summaryData.forEach((item: any) => {
-    const name = scaleMap[item.unitScale] || "其他";
-    cSum += (item.legalPersonNum || 0);
-    pSum += (item.employmentPersonnel || 0);
-    eSum += (item.operatingIncome || 0);
-    pMap[name] += (item.employmentPersonnel || 0);
-    eMap[name] += (item.operatingIncome || 0);
-  });
+  // --- 处理从业人员图表 ---
+  if (res.employmentPersonnel && Array.isArray(res.employmentPersonnel)) {
+    const pData = res.employmentPersonnel.map((item: any) => ({
+      name: item.name,
+      value: (Number(item.value) / 10000).toFixed(2), // 换算成“万”展示
+      itemStyle: { color: colorMap[item.name] || '#ccc' }
+    }));
+    // 计算总人数用于头部显示
+    totalPersonnel.value = res.employmentPersonnel.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
+    chart1?.setOption({ series: [{ data: pData }] });
+  }
 
-  totalCorporateCount.value = cSum;
-  totalPersonnel.value = pSum;
-  totalEconomic.value = eSum;
-
-  const format = (map: any) => categories.map(cat => ({
-    name: cat,
-    value: map[cat] / 10000,
-    itemStyle: { color: colorMap[cat] }
-  })).filter(item => item.value > 0); // 过滤掉值为0的
-
-  chart1?.setOption({ series: [{ data: format(pMap) }] });
-  chart2?.setOption({ series: [{ data: format(eMap) }] });
+  // --- 处理营业收入图表 ---
+  if (res.operatingIncome && Array.isArray(res.operatingIncome)) {
+    const eData = res.operatingIncome.map((item: any) => ({
+      name: item.name,
+      value: (Number(item.value) / 10000).toFixed(2), // 换算成“万”展示
+      itemStyle: { color: colorMap[item.name] || '#ccc' }
+    }));
+    // 计算总收入用于头部显示
+    totalEconomic.value = res.operatingIncome.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
+    chart2?.setOption({ series: [{ data: eData }] });
+  }
 };
 
 onMounted(() => {
-  if (donutChartRef.value) {
-    chart1 = echarts.init(donutChartRef.value);
-    chart1.setOption(getBasicOption('从业人员'));
+  if (personnelChartRef.value) {
+    chart1 = echarts.init(personnelChartRef.value);
+    chart1.setOption(getCommonOption());
   }
-  if (donutChart2Ref.value) {
-    chart2 = echarts.init(donutChart2Ref.value);
-    chart2.setOption(getBasicOption('营业收入'));
+  if (revenueChartRef.value) {
+    chart2 = echarts.init(revenueChartRef.value);
+    chart2.setOption(getCommonOption());
   }
   processData();
-  window.addEventListener('resize', () => { chart1?.resize(); chart2?.resize(); });
+  window.addEventListener('resize', () => {
+    chart1?.resize();
+    chart2?.resize();
+  });
 });
 
-watch(() => props.summaryData, processData, { deep: true });
+watch(() => props.summaryData, () => {
+  processData();
+}, { deep: true });
 </script>
 
 <style scoped>
+/* 左侧面板主容器样式 */
 .left {
-  width: 380px;
-  background-color: #fff;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  height: 100%;
+width: 380px;
+background-color: #fff;
+padding: 10px;
+border-radius: 4px;
+box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+display: flex;
+flex-direction: column;
+gap: 10px;
+flex-shrink: 0;
 }
+
+/* 卡片容器通用样式 */
 .item-box {
-  background-color: #fff;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #f0f0f0;
+background-color: #fff;
+border-radius: 4px;
+overflow: hidden;
+display: flex;
+flex-direction: column;
 }
+
+/* 卡片头部通用样式 */
 .head {
-  font-size: 14px;
-  color: #333;
-  font-weight: bold;
-  padding: 10px 15px;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
+display: flex;
+justify-content: space-between;
+align-items: center;
+font-size: 18px;
+color: #555454;
+padding: 12px 16px;
 }
+
+/* 内容区通用样式 */
 .content {
-  flex: 1;
-  position: relative;
-  min-height: 160px;
+flex: 1;
+position: relative;
+padding: 10px;
 }
+
+/* 法人单位数量特定样式 */
+.corporate-box .content {
+padding: 0;
+height: 100px;
+}
+
+/* 数字显示文本样式 */
 .item-1-text {
-  position: absolute;
-  left: 20px;
-  bottom: 20px;
-  font-size: 36px;
-  font-weight: bold;
-  color: white;
-  z-index: 2;
+position: absolute;
+left: 16px;
+bottom: 16px;
+font-size: 40px;
+font-weight: bold;
+color: white;
+text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+z-index: 2;
 }
+
+/* 从业人员和营业收入特定样式 */
+.personnel-box,
+.revenue-box {
+flex: 1 1 0%;
+}
+
+.personnel-box .content,
+.revenue-box .content {
+padding: 0;
+height: 100%;
+}
+
+/* 图表容器样式 */
 .chart-container {
-  width: 100%;
-  height: 100%;
+width: 100%;
+height: 100%;
+min-height: 150px;
 }
 </style>

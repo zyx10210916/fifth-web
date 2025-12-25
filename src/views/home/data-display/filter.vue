@@ -2,517 +2,446 @@
   <div v-if="isVisible" class="modal-overlay" @click.self="closeModal">
     <div class="modal-container">
       <div class="modal-header">
-        <h3>筛选条件</h3>
+        <h3 class="title">筛选条件</h3>
         <button class="close-btn" @click="closeModal">
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path fill="currentColor"
+              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z">
+            </path>
           </svg>
         </button>
       </div>
- 
+
       <div class="modal-content">
-        <!-- 左侧分类导航 -->
         <div class="category-nav">
-          <div 
-            v-for="(category, index) in categories" 
-            :key="index"
-            class="nav-item"
-            :class="{ active: activeCategory === index }"
-            @click="activeCategory = index"
-          >
-            {{ category.name }}
+          <div v-for="(cat, index) in categories" :key="index" class="nav-item"
+            :class="{ active: activeCategory === index }" @click="scrollToSection(index)">
+            {{ cat.name }}
           </div>
         </div>
- 
-        <!-- 右侧内容区域（可滚动） --> 
-        <div class="content-area" @scroll="handleScroll">
-          <!-- 地区筛选 -->
-          <div v-show="activeCategory === 0" class="filter-section">
-            <h4 class="section-title">地区</h4>
-            <div class="filter-options">
-              <div 
-                v-for="region in regions" 
-                :key="region"
-                class="option-item"
-                :class="{ active: selectedRegions.includes(region) }"
-                @click="toggleSelection(selectedRegions, region)"
-              >
-                <span class="check-icon">
-                  <svg v-if="selectedRegions.includes(region)" viewBox="0 0 24 24" width="14" height="14">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path>
-                  </svg>
-                </span>
-                <span class="option-label">{{ region }}</span>
+
+        <div class="content-area" ref="scrollContainer" @scroll="onScroll">
+          <div class="filter-section" id="section-0">
+            <h4 class="section-main-title">地区选择</h4>
+            <div v-for="dist in FILTER_MAP.regions" :key="dist.code" class="district-group">
+              <div class="dist-header" @click="toggleDistExpand(dist.code)">
+                <span class="arrow" :class="{ expanded: expandedDistricts.includes(dist.code) }">▶</span>
+                <label class="checkbox-wrapper" @click.stop>
+                  <input type="checkbox" :checked="selectedAreaCodes.includes(dist.code)"
+                    @change="toggle(selectedAreaCodes, dist.code)">
+                  <span class="checkbox-label" :class="{ checked: selectedAreaCodes.includes(dist.code) }">{{ dist.name
+                    }}</span>
+                </label>
+              </div>
+              <div class="street-options" v-if="expandedDistricts.includes(dist.code)">
+                <label v-for="street in dist.streets" :key="street.code" class="checkbox-wrapper">
+                  <input type="checkbox" :checked="selectedAreaCodes.includes(street.code)"
+                    @change="toggle(selectedAreaCodes, street.code)">
+                  <span class="checkbox-label" :class="{ checked: selectedAreaCodes.includes(street.code) }">{{
+                    street.name }}</span>
+                </label>
               </div>
             </div>
           </div>
- 
-          <!-- 注册类型筛选 -->
-          <div v-show="activeCategory === 1" class="filter-section">
-            <h4 class="section-title">注册类型</h4>
+
+          <div class="filter-section" id="section-1">
+            <h4 class="section-main-title">行业部门</h4>
             <div class="filter-options">
-              <div 
-                v-for="type in registrationTypes" 
-                :key="type"
-                class="option-item"
-                :class="{ active: selectedRegistrationTypes.includes(type) }"
-                @click="toggleSelection(selectedRegistrationTypes, type)"
-              >
-                <span class="check-icon">
-                  <svg v-if="selectedRegistrationTypes.includes(type)" viewBox="0 0 24 24" width="14" height="14">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path>
-                  </svg>
-                </span>
-                <span class="option-label">{{ type }}</span>
+              <div v-for="(code, name) in FILTER_MAP.industryDept" :key="code" class="option-pill"
+                :class="{ active: selectedDepts.includes(code) }" @click="toggle(selectedDepts, code)">
+                {{ name }}
               </div>
             </div>
           </div>
- 
-          <!-- 单位规模筛选 -->
-          <div v-show="activeCategory === 2" class="filter-section">
-            <h4 class="section-title">单位规模</h4>
-            <div class="filter-options">
-              <div 
-                v-for="size in unitSizes" 
-                :key="size"
-                class="option-item"
-                :class="{ active: selectedUnitSizes.includes(size) }"
-                @click="toggleSelection(selectedUnitSizes, size)"
-              >
-                <span class="check-icon">
-                  <svg v-if="selectedUnitSizes.includes(size)" viewBox="0 0 24 24" width="14" height="14">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path>
-                  </svg>
-                </span>
-                <span class="option-label">{{ size }}</span>
+
+          <div class="filter-section" id="section-2">
+            <h4 class="section-main-title">注册类型</h4>
+            <div class="filter-options grid-2">
+              <div v-for="(code, name) in FILTER_MAP.registerType" :key="code" class="option-pill"
+                :class="{ active: selectedRegTypes.includes(code) }" @click="toggle(selectedRegTypes, code)">
+                {{ name }}
               </div>
             </div>
           </div>
- 
-          <!-- 经营形式筛选 -->
-          <div v-show="activeCategory === 3" class="filter-section">
-            <h4 class="section-title">经营形式</h4>
+
+          <div class="filter-section" id="section-3">
+            <h4 class="section-main-title">单位规模</h4>
             <div class="filter-options">
-              <div 
-                v-for="mode in operationModes" 
-                :key="mode"
-                class="option-item"
-                :class="{ active: selectedOperationModes.includes(mode) }"
-                @click="toggleSelection(selectedOperationModes, mode)"
-              >
-                <span class="check-icon">
-                  <svg v-if="selectedOperationModes.includes(mode)" viewBox="0 0 24 24" width="14" height="14">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path>
-                  </svg>
-                </span>
-                <span class="option-label">{{ mode }}</span>
+              <div v-for="(code, name) in FILTER_MAP.unitSizes" :key="code" class="option-pill"
+                :class="{ active: selectedUnitSizes.includes(code) }" @click="toggle(selectedUnitSizes, code)">
+                {{ name }}
               </div>
             </div>
           </div>
- 
-          <!-- 行业门类筛选 -->
-          <div v-show="activeCategory === 4" class="filter-section">
-            <h4 class="section-title">行业门类</h4>
+
+          <div class="filter-section" id="section-4">
+            <h4 class="section-main-title">经营形式</h4>
             <div class="filter-options">
-              <div 
-                v-for="category in industryCategories" 
-                :key="category"
-                class="option-item"
-                :class="{ active: selectedIndustryCategories.includes(category) }"
-                @click="toggleSelection(selectedIndustryCategories, category)"
-              >
-                <span class="check-icon">
-                  <svg v-if="selectedIndustryCategories.includes(category)" viewBox="0 0 24 24" width="14" height="14">
-                    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"></path>
-                  </svg>
-                </span>
-                <span class="option-label">{{ category }}</span>
+              <div v-for="(code, name) in FILTER_MAP.businessOperationType" :key="code" class="option-pill"
+                :class="{ active: selectedBizTypes.includes(code) }" @click="toggle(selectedBizTypes, code)">
+                {{ name }}
               </div>
             </div>
           </div>
+
+          <div class="filter-section" id="section-5">
+            <h4 class="section-main-title">控股情况</h4>
+            <div class="filter-options">
+              <div v-for="(code, name) in FILTER_MAP.holdingSituation" :key="code" class="option-pill"
+                :class="{ active: selectedHoldings.includes(code) }" @click="toggle(selectedHoldings, code)">
+                {{ name }}
+              </div>
+            </div>
+          </div>
+
+          <div class="filter-section" id="section-6">
+            <h4 class="section-main-title">行业门类</h4>
+            <div class="filter-options grid-2">
+              <div v-for="(code, name) in FILTER_MAP.industryCategory" :key="code" class="option-pill"
+                :class="{ active: selectedIndCats.includes(code) }" @click="toggle(selectedIndCats, code)">
+                {{ name }}
+              </div>
+            </div>
+          </div>
+          <div style="height: 400px;"></div>
         </div>
       </div>
- 
+
       <div class="modal-footer">
-        <button class="action-btn clear-btn" @click="clearAllSelections">清除</button>
-        <button class="action-btn apply-btn" @click="applyFilters">确定</button>
+        <button class="action-btn clear-btn" @click="clearAll">清除</button>
+        <button class="action-btn apply-btn" @click="apply">确定</button>
       </div>
     </div>
   </div>
 </template>
- 
+
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
- 
-const props = defineProps<{
-  isVisible: boolean;
-}>();
- 
+import { ref } from 'vue';
+import { FILTER_MAP } from './filter-config';
+
+const props = defineProps<{ isVisible: boolean }>();
 const emit = defineEmits(['update:isVisible', 'apply']);
- 
-// 左侧分类导航
-const categories = ref([
-  { name: '地区', id: 'region-section' },
-  { name: '注册类型', id: 'type-section' },
-  { name: '单位规模', id: 'size-section' },
-  { name: '经营形式', id: 'mode-section' },
-  { name: '行业门类', id: 'category-section' }
-]);
+
+const categories = [
+  { name: '地区' }, { name: '行业部门' }, { name: '注册类型' },
+  { name: '单位规模' }, { name: '经营形式' }, { name: '控股情况' }, { name: '行业门类' }
+];
+
 const activeCategory = ref(0);
- 
-// 筛选数据 
-const regions = ref(['越秀区', '荔湾区', '海珠区', '天河区', '白云区', '黄埔区', '番禺区', '花都区', '南沙区', '从化区', '增城区']);
- 
-const registrationTypes = ref([
-  '内资企业',
-  '有限责任公司',
-  '国有独资公司',
-  '私营有限责任公司',
-  '其他有限责任公司',
-  '股份有限公司',
-  '私营股份有限公司',
-  '其他股份有限公司',
-  '非公司企业法人',
-  '全民所有制企业（国有企业）',
-  '集体所有制企业（集体企业）',
-  '股份合作企业',
-  '联营企业',
-  '个人独资企业',
-  '合伙企业',
-  '其他内资企业',
-  '港澳台投资企业',
-  '港澳台投资有限责任公司',
-  '港澳台投资股份有限公司',
-  '港澳台投资合伙企业',
-  '其他港澳台投资企业',
-  '外商投资企业',
-  '外商投资有限责任公司',
-  '外商投资股份有限公司',
-  '外商投资合伙企业',
-  '其他外商投资企业',
-  '农民专业合作社（联合社）',
-  '个体工商户'
-]);
- 
-const unitSizes = ref(['大型', '中型', '小型', '微型']);
- 
-const operationModes = ref([
-  '独立门店',
-  '连锁总店（总部）',
-  '连锁直营店',
-  '连锁加盟店',
-  '其他'
-]);
- 
-const industryCategories = ref([
-  '农、林、牧、渔业',
-  '采矿业',
-  '制造业',
-  '电力、热力、燃气及水生产和供应业',
-  '建筑业',
-  '批发和零售业',
-  '交通运输、仓储和邮政业',
-  '住宿和餐饮业',
-  '信息传输、软件和信息技术服务业',
-  '金融业',
-  '房地产业',
-  '租赁和商务服务业',
-  '科学研究和技术服务业',
-  '水利、环境和公共设施管理业',
-  '居民服务、修理和其他服务业',
-  '教育',
-  '卫生和社会工作',
-  '文化、体育和娱乐业',
-  '公共管理、社会保障和社会组织',
-  '国际组织'
-]);
- 
-// 选中的筛选条件
-const selectedRegions = ref<string[]>([]);
-const selectedRegistrationTypes = ref<string[]>([]);
+const scrollContainer = ref<HTMLElement | null>(null);
+
+// 修改：初始化为空数组，实现默认折叠
+const expandedDistricts = ref<string[]>([]);
+
+// 选中项状态
+const selectedAreaCodes = ref<string[]>([]);
+const selectedDepts = ref<string[]>([]);
+const selectedRegTypes = ref<string[]>([]);
 const selectedUnitSizes = ref<string[]>([]);
-const selectedOperationModes = ref<string[]>([]);
-const selectedIndustryCategories = ref<string[]>([]);
- 
-function toggleSelection(selectedList: string[], item: string) {
-  const index = selectedList.indexOf(item);
-  if (index > -1) {
-    selectedList.splice(index, 1);
-  } else {
-    selectedList.push(item);
+const selectedBizTypes = ref<string[]>([]);
+const selectedHoldings = ref<string[]>([]);
+const selectedIndCats = ref<string[]>([]);
+
+function toggleDistExpand(code: string) {
+  const idx = expandedDistricts.value.indexOf(code);
+  if (idx > -1) expandedDistricts.value.splice(idx, 1);
+  else expandedDistricts.value.push(code);
+}
+
+function toggle(list: string[], code: string) {
+  const i = list.indexOf(code);
+  if (i > -1) list.splice(i, 1);
+  else list.push(code);
+}
+
+function scrollToSection(index: number) {
+  activeCategory.value = index;
+  const target = document.getElementById(`section-${index}`);
+  if (target && scrollContainer.value) {
+    scrollContainer.value.scrollTo({
+      top: target.offsetTop - 10,
+      behavior: 'smooth'
+    });
   }
 }
- 
-function clearAllSelections() {
-  selectedRegions.value = [];
-  selectedRegistrationTypes.value = [];
-  selectedUnitSizes.value = [];
-  selectedOperationModes.value = [];
-  selectedIndustryCategories.value = [];
+
+function onScroll() {
+  if (!scrollContainer.value) return;
+  const containerTop = scrollContainer.value.getBoundingClientRect().top;
+  for (let i = 0; i < categories.length; i++) {
+    const section = document.getElementById(`section-${i}`);
+    if (section) {
+      const rect = section.getBoundingClientRect();
+      if (rect.top - containerTop <= 60) {
+        activeCategory.value = i;
+      }
+    }
+  }
 }
- 
-function applyFilters() {
-  const filters = {
-    regions: selectedRegions.value,
-    registrationTypes: selectedRegistrationTypes.value,
-    unitSizes: selectedUnitSizes.value,
-    operationModes: selectedOperationModes.value,
-    industryCategories: selectedIndustryCategories.value,
-  };
-  
-  emit('apply', filters);
+
+function clearAll() {
+  selectedAreaCodes.value = []; selectedDepts.value = []; selectedRegTypes.value = [];
+  selectedUnitSizes.value = []; selectedBizTypes.value = []; selectedHoldings.value = [];
+  selectedIndCats.value = [];
+}
+
+function apply() {
+  emit('apply', {
+    area: selectedAreaCodes.value.join(','),
+    industryDept: selectedDepts.value.join(','),
+    registerType: selectedRegTypes.value.join(','),
+    unitScale: selectedUnitSizes.value.join(','),
+    businessOperationType: selectedBizTypes.value.join(','),
+    holdingSituation: selectedHoldings.value.join(','),
+    industryCategory: selectedIndCats.value.join(',')
+  });
   closeModal();
 }
- 
-function closeModal() {
-  emit('update:isVisible', false);
-}
- 
-// 滚动同步
-const handleScroll = (event: Event) => {
-  const scrollTop = (event.target as HTMLElement).scrollTop;
-  const sections = document.querySelectorAll('.filter-section');
-  
-  // 找出当前可见的区域 
-  for (let i = sections.length - 1; i >= 0; i--) {
-    const section = sections[i] as HTMLElement;
-    const offsetTop = section.offsetTop - 20;
-    
-    if (scrollTop >= offsetTop) {
-      activeCategory.value = i;
-      break;
-    }
-  }
-};
- 
-// 点击左侧导航时滚动到对应区域 
-watch(activeCategory, (newVal) => {
-  nextTick(() => {
-    const sections = document.querySelectorAll('.filter-section');
-    if (sections[newVal]) {
-      const contentArea = document.querySelector('.content-area') as HTMLElement;
-      contentArea.scrollTo({
-        top: (sections[newVal] as HTMLElement).offsetTop - 20,
-        behavior: 'smooth'
-      });
-    }
-  });
-});
+
+function closeModal() { emit('update:isVisible', false); }
 </script>
- 
+
 <style scoped>
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 3000;
 }
- 
+
 .modal-container {
-  background-color: #fff;
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-  width: 800px;
-  max-height: 80vh;
+  width: 850px;
+  height: 800px;
+  /* 增加高度 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
- 
+
 .modal-header {
-  padding: 20px;
+  padding: 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #fff;
+  border-bottom: 1px solid #f0f0f0;
 }
- 
-.modal-header h3 {
-  margin: 0;
+
+.modal-header .title {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: bold;
   color: #333;
+  margin: 0;
 }
- 
+
 .close-btn {
   background: none;
   border: none;
-  padding: 4px;
   cursor: pointer;
   color: #999;
-  transition: color 0.2s;
-  border-radius: 4px;
 }
- 
-.close-btn:hover {
-  color: #333;
-  background-color: #f5f5f5;
-}
- 
+
 .modal-content {
   display: flex;
   flex: 1;
-  min-height: 0;
   overflow: hidden;
 }
- 
+
+/* 左侧导航 - 居中排列 */
 .category-nav {
-  width: 120px;
+  width: 140px;
+  background: #f8f9fb;
+  border-right: 1px solid #eee;
   padding: 10px 0;
-  background-color: #f9f9f9;
-  overflow-y: auto;
 }
- 
+
 .nav-item {
-  padding: 12px 16px;
+  padding: 18px 10px;
   cursor: pointer;
-  color: #666;
   font-size: 14px;
-  transition: all 0.2s;
-  border-radius: 6px;
-  margin: 4px 8px;
+  color: #666;
+  text-align: center;
+  transition: all 0.3s;
+  position: relative;
 }
- 
-.nav-item:hover {
-  background-color: #f0f0f0;
-}
- 
+
 .nav-item.active {
-  background-color: #f0f6ff;
-  color: #1a73e8;
-  font-weight: 500;
+  background: #fff;
+  color: #546fff;
+  font-weight: bold;
 }
- 
+
+.nav-item.active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 25%;
+  height: 50%;
+  width: 3px;
+  background: #546fff;
+}
+
+/* 右侧内容区域 */
 .content-area {
   flex: 1;
-  padding: 0 20px 20px 20px;
+  padding: 0 30px;
   overflow-y: auto;
   scroll-behavior: smooth;
 }
- 
+
 .filter-section {
-  margin-bottom: 30px;
-  padding-top: 20px;
+  padding: 30px 0;
+  border-bottom: 1px solid #f5f5f5;
 }
- 
-.section-title {
-  margin: 0 0 15px 0;
+
+.section-main-title {
   font-size: 15px;
-  font-weight: 500;
+  font-weight: bold;
   color: #333;
+  margin-bottom: 25px;
 }
- 
-.filter-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+
+/* 地区复选框 */
+.district-group {
+  margin-bottom: 15px;
 }
- 
-.option-item {
+
+.dist-header {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: 6px;
+  margin-bottom: 10px;
   cursor: pointer;
-  transition: all 0.2s;
-  background-color: #f5f5f5;
-  color: #555;
 }
- 
-.option-item:hover {
-  background-color: #eaeaea;
+
+.arrow {
+  font-size: 10px;
+  color: #bbb;
+  margin-right: 10px;
+  transition: transform 0.2s;
 }
- 
-.option-item.active {
-  background-color: #e1ecfe;
-  color: #1a73e8;
-  border: 1px solid #1a73e8;
+
+.arrow.expanded {
+  transform: rotate(90deg);
 }
- 
-.check-icon {
+
+.checkbox-wrapper {
   display: inline-flex;
   align-items: center;
+  cursor: pointer;
+  margin-right: 15px;
+  user-select: none;
+}
+
+.checkbox-wrapper input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #546fff;
+}
+
+.checkbox-label {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.checkbox-label.checked {
+  color: #546fff;
+  font-weight: 500;
+}
+
+.street-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding-left: 30px;
+  margin-top: 10px;
+}
+
+/* 选项卡（药丸型/胶囊型） */
+.filter-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.option-pill {
+  height: 44px;
+  /* 高度调大 */
+  display: flex;
+  align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  color: currentColor;
+  /* 字体居中 */
+  background: #f5f7fa;
+  border-radius: 22px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  padding: 0 12px;
+  text-align: center;
 }
- 
-.option-label {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+
+.option-pill:hover {
+  background: #eef2ff;
+  color: #546fff;
 }
- 
+
+.option-pill.active {
+  background: #f0f4ff;
+  color: #546fff;
+  border-color: #546fff;
+  font-weight: bold;
+}
+
+/* 底部按钮大小保持一致 */
 .modal-footer {
+  padding: 20px 24px;
+  border-top: 1px solid #f0f0f0;
   display: flex;
   justify-content: flex-end;
-  padding: 16px 20px;
-  background-color: #fff;
-  gap: 12px;
+  gap: 15px;
 }
- 
+
 .action-btn {
-  padding: 8px 20px;
-  border-radius: 6px;
+  width: 110px;
+  /* 统一宽度 */
+  height: 40px;
+  /* 统一高度 */
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
   border: none;
-  outline: none;
+  transition: opacity 0.2s;
 }
- 
+
+.apply-btn {
+  background: #546fff;
+  color: #fff;
+}
+
 .clear-btn {
-  background-color: #f5f5f5;
+  background: #f5f5f5;
   color: #666;
 }
- 
-.clear-btn:hover {
-  background-color: #e0e0e0;
-}
- 
-.apply-btn {
-  background-color: #1a73e8;
-  color: white;
-}
- 
-.apply-btn:hover {
-  background-color: #0d62c9;
-}
- 
-/* 自定义滚动条 */
+
 .content-area::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
- 
-.content-area::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
- 
+
 .content-area::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
- 
-.content-area::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
- 
-.category-nav::-webkit-scrollbar {
-  width: 4px;
-}
- 
-.category-nav::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #ddd;
+  border-radius: 10px;
 }
 </style>
