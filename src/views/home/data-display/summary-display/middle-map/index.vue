@@ -1,63 +1,65 @@
 <template>
-  <div id="viewDiv" style="width: 100%; height: 100vh; position: relative;">
-    <!-- Loading状态提示 -->
-    <div v-if="loading" class="loading-overlay">
-      <div class="loading-content">
-        <div class="spinner"></div>
-        <div class="loading-text">{{ loadingText }}</div>
+  <div class="map-container">
+    <div id="viewDiv" style="width: 100%; height: 100vh; position: relative;">
+      <!-- Loading状态提示 -->
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-content">
+          <div class="spinner"></div>
+          <div class="loading-text">{{ loadingText }}</div>
+        </div>
       </div>
-    </div>
 
-    <ul class="mapType">
-      <li v-for="item in mapList" :key="item.id" @click="handleBasemapChange(item.id)"
-        :class="['item', item.className, { actived: activeBasemapId === item.id }]"
-        :style="{ backgroundImage: `url(${activeBasemapId === item.id ? item.imgActive : item.imgNormal})` }">
-        <span class="map-label">{{ item.name }}</span>
-      </li>
-    </ul>
+      <ul class="mapType">
+        <li v-for="item in mapList" :key="item.id" @click="handleBasemapChange(item.id)"
+          :class="['item', item.className, { actived: activeBasemapId === item.id }]"
+          :style="{ backgroundImage: `url(${activeBasemapId === item.id ? item.imgActive : item.imgNormal})` }">
+          <span class="map-label">{{ item.name }}</span>
+        </li>
+      </ul>
 
-    <MapTools :view="view" @select-complete="handleSelectionComplete" />
+      <MapTools :view="view" @select-complete="handleSelectionComplete" />
 
-    <div class="layer-tree-panel">
-      <div class="panel-header">
-        <h3>目录树</h3>
-        <button @click="togglePanel" class="toggle-btn">{{ panelVisible ? '隐藏' : '显示' }}</button>
-      </div>
-      <div v-if="panelVisible" class="tree-content">
-        <div class="tree-node tree-group"><label>经济普查数据</label></div>
-        <div v-for="layer in economicLayers" :key="layer.id" class="tree-node">
-          <input type="checkbox" :id="layer.id" v-model="layer.visible" @change="updateLayerVisibility(layer)"
-            class="tree-checkbox">
-          <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
+      <div class="layer-tree-panel">
+        <div class="panel-header">
+          <h3>目录树</h3>
+          <button @click="togglePanel" class="toggle-btn">{{ panelVisible ? '隐藏' : '显示' }}</button>
         </div>
+        <div v-if="panelVisible" class="tree-content">
+          <div class="tree-node tree-group"><label>经济普查数据</label></div>
+          <div v-for="layer in economicLayers" :key="layer.id" class="tree-node">
+            <input type="checkbox" :id="layer.id" v-model="layer.visible" @change="updateLayerVisibility(layer)"
+              class="tree-checkbox">
+            <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
+          </div>
 
-        <div class="tree-node tree-group"><label>基础地理数据</label></div>
-        <div class="tree-node">
-          <input type="checkbox" id="basemap" v-model="basemapVisible" @change="updateBasemapVisibility"
-            class="tree-checkbox">
-          <label for="basemap" class="tree-label">底图</label>
-        </div>
-        <div v-for="layer in boundaryLayers" :key="layer.id" class="tree-node">
-          <input type="checkbox" :id="layer.id" v-model="layer.visible" @change="updateLayerVisibility(layer)"
-            class="tree-checkbox">
-          <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
-        </div>
+          <div class="tree-node tree-group"><label>基础地理数据</label></div>
+          <div class="tree-node">
+            <input type="checkbox" id="basemap" v-model="basemapVisible" @change="updateBasemapVisibility"
+              class="tree-checkbox">
+            <label for="basemap" class="tree-label">底图</label>
+          </div>
+          <div v-for="layer in boundaryLayers" :key="layer.id" class="tree-node">
+            <input type="checkbox" :id="layer.id" v-model="layer.visible" @change="updateLayerVisibility(layer)"
+              class="tree-checkbox">
+            <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
+          </div>
 
-        <div class="tree-node tree-group"><label>文本标注</label></div>
-        <div class="tree-node">
-          <input type="checkbox" id="labelDistrict" v-model="labelVisibility.district" @change="updateLabelVisibility"
-            class="tree-checkbox">
-          <label for="labelDistrict" class="tree-label">区县名称</label>
-        </div>
-        <div class="tree-node">
-          <input type="checkbox" id="labelTown" v-model="labelVisibility.town" @change="updateLabelVisibility"
-            class="tree-checkbox">
-          <label for="labelTown" class="tree-label">镇街名称</label>
-        </div>
-        <div class="tree-node">
-          <input type="checkbox" id="labelVillage" v-model="labelVisibility.village" @change="updateLabelVisibility"
-            class="tree-checkbox">
-          <label for="labelVillage" class="tree-label">村居名称</label>
+          <div class="tree-node tree-group"><label>文本标注</label></div>
+          <div class="tree-node">
+            <input type="checkbox" id="labelDistrict" v-model="labelVisibility.district" @change="updateLabelVisibility"
+              class="tree-checkbox">
+            <label for="labelDistrict" class="tree-label">区县名称</label>
+          </div>
+          <div class="tree-node">
+            <input type="checkbox" id="labelTown" v-model="labelVisibility.town" @change="updateLabelVisibility"
+              class="tree-checkbox">
+            <label for="labelTown" class="tree-label">镇街名称</label>
+          </div>
+          <div class="tree-node">
+            <input type="checkbox" id="labelVillage" v-model="labelVisibility.village" @change="updateLabelVisibility"
+              class="tree-checkbox">
+            <label for="labelVillage" class="tree-label">村居名称</label>
+          </div>
         </div>
       </div>
     </div>
@@ -130,94 +132,94 @@ export default {
 
     // 创建文本标注层 
     const createLabelLayer = async (layerId, features, modules) => {
-  try {
-    const [FeatureLayer, TextSymbol, LabelClass, Point] = [
-      modules[2], modules[7], modules[8], modules[9]
-    ];
- 
-    const labelFields = {
-      district: 'QMC',
-      town: 'JDMC',
-      village: 'XZQMC'
-    };
- 
-    const labelField = labelFields[layerId];
-    if (!labelField) return null;
- 
-    const graphics = [];
-    const uniqueNames = new Set(); // 用于存储已经处理过的名称
- 
-    features.forEach((f, index) => {
-      // 兼容处理：ArcGIS查询出来的要素属性在 attributes 里，GeoJSON 在 properties 里 
-      const attr = f.attributes || f.properties;
-      if (!attr) return;
- 
-      const textValue = attr[labelField];
-      if (textValue && !uniqueNames.has(textValue)) { // 检查是否已存在该名称
-        uniqueNames.add(textValue); // 添加到已处理集合 
-        
-        let centerPoint = null;
- 
-        if (f.geometry) {
-          if (f.geometry.type === "point") {
-            centerPoint = f.geometry;
-          } else {
-            // 如果是多边形，使用内置的 centroid (质心) 或 extent.center 
-            centerPoint = f.geometry.centroid || f.geometry.extent.center;
-          }
-        }
- 
-        if (centerPoint) {
-          graphics.push({
-            geometry: centerPoint,
-            attributes: {
-              ObjectID: index,
-              LABEL_TEXT: String(textValue)
+      try {
+        const [FeatureLayer, TextSymbol, LabelClass, Point] = [
+          modules[2], modules[7], modules[8], modules[9]
+        ];
+
+        const labelFields = {
+          district: 'QMC',
+          town: 'JDMC',
+          village: 'XZQMC'
+        };
+
+        const labelField = labelFields[layerId];
+        if (!labelField) return null;
+
+        const graphics = [];
+        const uniqueNames = new Set(); // 用于存储已经处理过的名称
+
+        features.forEach((f, index) => {
+          // 兼容处理：ArcGIS查询出来的要素属性在 attributes 里，GeoJSON 在 properties 里 
+          const attr = f.attributes || f.properties;
+          if (!attr) return;
+
+          const textValue = attr[labelField];
+          if (textValue && !uniqueNames.has(textValue)) { // 检查是否已存在该名称
+            uniqueNames.add(textValue); // 添加到已处理集合 
+
+            let centerPoint = null;
+
+            if (f.geometry) {
+              if (f.geometry.type === "point") {
+                centerPoint = f.geometry;
+              } else {
+                // 如果是多边形，使用内置的 centroid (质心) 或 extent.center 
+                centerPoint = f.geometry.centroid || f.geometry.extent.center;
+              }
             }
-          });
-        }
+
+            if (centerPoint) {
+              graphics.push({
+                geometry: centerPoint,
+                attributes: {
+                  ObjectID: index,
+                  LABEL_TEXT: String(textValue)
+                }
+              });
+            }
+          }
+        });
+
+        const styleConfig = {
+          district: { size: 14, color: "#222" },
+          town: { size: 12, color: "#444" },
+          village: { size: 10, color: "#666" }
+        };
+
+        const labelLayer = new FeatureLayer({
+          id: `${layerId}_labels`,
+          source: graphics,
+          fields: [
+            { name: "ObjectID", type: "oid" },
+            { name: "LABEL_TEXT", type: "string" }
+          ],
+          objectIdField: "ObjectID",
+          labelingInfo: [{
+            symbol: new TextSymbol({
+              color: styleConfig[layerId].color,
+              haloColor: "white",
+              haloSize: "1.5px",
+              font: { size: styleConfig[layerId].size, weight: "bold", family: "Microsoft YaHei" }
+            }),
+            labelPlacement: "center-center",
+            labelExpressionInfo: { expression: "$feature.LABEL_TEXT" }
+          }],
+          renderer: {
+            type: "simple",
+            symbol: { type: "simple-marker", size: 0 } // 隐藏点
+          },
+          spatialReference: { wkid: 4526 },
+          visible: labelVisibility.value[layerId]
+        });
+
+        labelLayers.value[layerId] = labelLayer;
+        return labelLayer;
+      } catch (error) {
+        console.error(`创建${layerId}层失败:`, error);
+        return null;
       }
-    });
- 
-    const styleConfig = {
-      district: { size: 14, color: "#222" },
-      town: { size: 12, color: "#444" },
-      village: { size: 10, color: "#666" }
     };
- 
-    const labelLayer = new FeatureLayer({
-      id: `${layerId}_labels`,
-      source: graphics,
-      fields: [
-        { name: "ObjectID", type: "oid" },
-        { name: "LABEL_TEXT", type: "string" }
-      ],
-      objectIdField: "ObjectID",
-      labelingInfo: [{
-        symbol: new TextSymbol({
-          color: styleConfig[layerId].color,
-          haloColor: "white",
-          haloSize: "1.5px",
-          font: { size: styleConfig[layerId].size, weight: "bold", family: "Microsoft YaHei" }
-        }),
-        labelPlacement: "center-center",
-        labelExpressionInfo: { expression: "$feature.LABEL_TEXT" }
-      }],
-      renderer: {
-        type: "simple",
-        symbol: { type: "simple-marker", size: 0 } // 隐藏点
-      },
-      spatialReference: { wkid: 4526 },
-      visible: labelVisibility.value[layerId]
-    });
- 
-    labelLayers.value[layerId] = labelLayer;
-    return labelLayer;
-  } catch (error) {
-    console.error(`创建${layerId}层失败:`, error);
-    return null;
-  }
-};
 
     // JSON转FeatureLayer函数 
     const createJsonLayer = async (config) => {
@@ -245,7 +247,7 @@ export default {
           } else if (type === "Polygon") {
             geometry = { type: "polygon", rings: coords, spatialReference: { wkid: 4526 } };
           } else if (type === "MultiPolygon") {
-            const allRings =[];
+            const allRings = [];
             coords.forEach(polygonCoords => {
               polygonCoords.forEach(ring => {
                 allRings.push(ring);
@@ -465,174 +467,114 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-#viewDiv {
-  padding: 0;
-  margin: 0;
-  height: 100vh;
-  width: 100%;
-  position: relative;
+.map-container {
+  flex: 1;
+  background: white;
+  margin: 0 15px;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+
+  #viewDiv {
+    height: 100%;
+  }
 }
 
 .layer-tree-panel {
   position: absolute;
   top: 20px;
-  left: 20px;
+  left: 2%;
   z-index: 50;
   background: white;
-  border-radius: 4px;
-  width: 220px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  width: 240px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
 .panel-header {
+  padding: 10px 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f8f8f8;
-  border-bottom: 1px solid #ddd;
-}
 
-.panel-header h3 {
-  margin: 0;
-  font-size: 14px;
+  h3 {
+    margin: 0;
+    font-size: 15px;
+    color: #333;
+  }
 }
 
 .tree-content {
+  padding: 15px;
+}
+
+.config-section {
+  background: #f0f7ff;
   padding: 10px;
-  max-height: 400px;
-  overflow-y: auto;
+  border-radius: 6px;
+  margin-bottom: 15px;
+
+  .label-text {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
+  }
+
+  .tip-text {
+    font-size: 11px;
+    color: #999;
+    margin-top: 5px;
+  }
+}
+
+.custom-select {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  outline: none;
+  font-size: 13px;
 }
 
 .tree-node {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   font-size: 13px;
 }
 
 .tree-group {
   font-weight: bold;
-  margin-top: 10px;
-  margin-bottom: 5px !important;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 5px;
+  border-left: 3px solid #0091ff;
+  padding-left: 8px;
+  margin-top: 15px;
 }
 
 .tree-checkbox {
-  margin-right: 8px;
+  margin-right: 10px;
   cursor: pointer;
 }
 
-.tree-label {
-  cursor: pointer;
-}
-
-.toggle-btn {
-  background: #f0f0f0;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  padding: 2px 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.mapType {
-  height: 60px;
-  width: 72px;
-  position: absolute;
-  bottom: 15%;
-  right: 20px;
-  cursor: pointer;
-  z-index: 100;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-  transition: width 0.3s;
-
-  .item {
-    position: absolute;
-    bottom: 0;
-    width: 72px;
-    height: 100%;
-    border: 1px solid rgba(125, 125, 125, 0.8);
-    border-radius: 4px;
-    transition: all 0.3s;
-    background-size: 100% 100%;
-
-    .map-label {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      background: rgba(60, 60, 60, 0.9);
-      color: white;
-      font-size: 12px;
-      padding: 1px 6px;
-      border-radius: 4px 0 0 0;
-    }
-
-    &.actived {
-      border: 2px solid #0091ff;
-
-      .map-label {
-        background: #0091ff;
-      }
-    }
-  }
-
-  .mapType-image {
-    right: 0;
-    z-index: 1;
-  }
-
-  .mapType-normal {
-    right: 0;
-    z-index: 2;
-  }
-
-  &:hover {
-    width: 160px;
-
-    .mapType-image {
-      right: 80px;
-    }
-  }
-}
-
+/* 加载 */
 .loading-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.8);
-  z-index: 999;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.loading-content {
-  text-align: center;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
-
 .spinner {
-  width: 50px;
-  height: 50px;
-  margin: 0 auto 15px;
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #3498db;
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #0091ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-.loading-text {
-  font-size: 16px;
-  color: #333;
+  margin: 0 auto 10px;
 }
 
 @keyframes spin {
@@ -642,6 +584,40 @@ export default {
 
   100% {
     transform: rotate(360deg);
+  }
+}
+
+.mapType {
+  position: absolute;
+  bottom: 30px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  gap: 10px;
+  list-style: none;
+
+  .item {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    border: 2px solid white;
+    cursor: pointer;
+    background-size: cover;
+    position: relative;
+
+    &.actived {
+      border-color: #0091ff;
+    }
+
+    .map-label {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      font-size: 11px;
+    }
   }
 }
 </style>

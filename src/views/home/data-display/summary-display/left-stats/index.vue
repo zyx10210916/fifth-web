@@ -72,9 +72,10 @@
     </div>
  
    <!-- 从业人员期末人数卡片 -->
-   <div class="item-box personnel-box" cid="ItemBox">
+    <div class="item-box personnel-box" cid="ItemBox">
       <div class="head">
-        从业人员期末人数，总计：{{ (totalPersonnel / 10000).toFixed(2) }}万 
+        <span>从业人员期末人数</span>
+        <span class="total-badge">{{ (totalPersonnel / 10000).toFixed(2) }} 万人</span>
       </div>
       <div class="content flex-content">
         <div ref="personnelChartRef" class="chart-container"></div>
@@ -82,9 +83,10 @@
     </div>
  
     <!-- 营业收入卡片 -->
-   <div class="item-box revenue-box" cid="ItemBox">
+    <div class="item-box revenue-box" cid="ItemBox">
       <div class="head">
-        营业收入，总计：{{ (totalEconomic / 10000).toFixed(2) }}万元
+        <span>营业收入</span>
+        <span class="total-badge">{{ (totalEconomic / 10000).toFixed(2) }} 万元</span>
       </div>
       <div class="content flex-content">
         <div ref="revenueChartRef" class="chart-container"></div>
@@ -97,7 +99,7 @@
 import * as echarts from 'echarts';
 import { ref, watch, onMounted } from 'vue';
 
-// 1. 接收父组件传来的数据 (此时 props.summaryData 对应的是后端返回的 data 对象)
+// 接收父组件传来的数据
 const props = defineProps({
   summaryData: { type: Object, default: () => ({}) }
 });
@@ -114,39 +116,42 @@ const totalEconomic = ref(0);
 
 // 颜色映射表
 const colorMap: any = {
-  "大型": "#5470c6",
-  "中型": "#91cc75",
-  "小型": "#fac858",
+  "大型": "#57defd",
+  "中型": "#b3e34b",
+  "小型": "#ffb570",
   "微型": "#ee6666",
-  "未知": "#73c0de"
+  "未知": "#8088ff"
 };
 
 // ECharts 基础配置
 const getCommonOption = () => ({
   legend: {
     orient: 'vertical',
-    right: '2%',      // 图例靠右
+    right: '5%',   
     top: 'center',
-    itemWidth: 10,
-    itemHeight: 10,
-    textStyle: { color: '#666', fontSize: 16 }
+    itemWidth: 12,
+    itemHeight: 12,
+    itemGap: 25,
+    textStyle: { color: '#666', fontSize: 18 }
   },
   tooltip: {
     trigger: 'item',
-    backgroundColor: 'rgba(50, 50, 50, 0.7)',
+    backgroundColor: 'rgba(50, 50, 50, 0.8)',
     borderWidth: 0,
-    textStyle: { color: '#fff' },
+    textStyle: { color: 'white' ,fontSize: 18},
     formatter: (p: any) => `<span style="display:inline-block;margin-right:5px;border-radius:50%;width:10px;height:10px;background-color:${p.color};"></span>${p.name}: ${p.value}`
   },
   series: [{
     type: 'pie',
-    radius: ['40%', '80%'],
-    center: ['40%', '50%'], // 图表左移给图例留位
+    radius: ['50%', '70%'],
+    center: ['40%', '50%'], 
     avoidLabelOverlap: false,
-    itemStyle: { borderRadius: 0, borderColor: '#fff', borderWidth: 2 },
-    label: { show: false, position: 'center', formatter: '{b}', fontSize: 20, fontWeight: 'bold' },
+    itemStyle: { borderRadius: 0, borderColor: '#f5f5f5', borderWidth: 8 },
+    label: { show: false, position: 'center', formatter: '{b}', fontSize: 36, fontWeight: 'bold' },
     emphasis: {
-      label: { show: true, fontSize: 20, fontWeight: 'bold', color: 'inherit' }
+      scale:true,
+      scaleSize: 20,
+      label: { show: true, fontSize: 36, fontWeight: 'bold', color: 'inherit' }
     },
     data: []
   }]
@@ -157,8 +162,7 @@ const processData = () => {
   const res = props.summaryData;
   if (!res || Object.keys(res).length === 0) return;
 
-  // --- 关键：处理法人单位数量 ---
-  // 直接从对象属性读取，确保能拿到 866500 这个值
+  // --- 处理法人单位数量 ---
   totalCorporateCount.value = res.legalPersonNum || 0;
 
   // --- 处理从业人员图表 ---
@@ -210,10 +214,11 @@ watch(() => props.summaryData, () => {
 <style scoped>
 /* 左侧面板主容器样式 */
 .left {
-width: 380px;
-background-color: #fff;
+width: 480px;
+height: 100%;
+background-color: white;
 padding: 10px;
-border-radius: 4px;
+border-radius: 6px;
 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 display: flex;
 flex-direction: column;
@@ -223,7 +228,7 @@ flex-shrink: 0;
 
 /* 卡片容器通用样式 */
 .item-box {
-background-color: #fff;
+background-color: white;
 border-radius: 4px;
 overflow: hidden;
 display: flex;
@@ -232,19 +237,29 @@ flex-direction: column;
 
 /* 卡片头部通用样式 */
 .head {
-display: flex;
-justify-content: space-between;
-align-items: center;
-font-size: 18px;
-color: #555454;
-padding: 12px 16px;
+  display: flex;
+  justify-content: space-between; 
+  align-items: center;
+  font-size: 20px;       
+  font-weight: bold;     
+  color: #333333;
+  padding: 12px 16px;
+}
+
+.total-badge {
+  font-size: 18px;       
+  font-weight: normal;    
+  background-color: #f5f5f5; 
+  padding: 4px 12px;      
+  border-radius: 20px;   
+  margin-left: 10px;      
 }
 
 /* 内容区通用样式 */
 .content {
 flex: 1;
 position: relative;
-padding: 10px;
+padding: 0px 10px 10px 10px;
 }
 
 /* 法人单位数量特定样式 */
@@ -256,9 +271,9 @@ height: 100px;
 /* 数字显示文本样式 */
 .item-1-text {
 position: absolute;
-left: 16px;
-bottom: 16px;
-font-size: 40px;
+left: 20px;
+top: 42px;
+font-size: 44px;
 font-weight: bold;
 color: white;
 text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -281,6 +296,6 @@ height: 100%;
 .chart-container {
 width: 100%;
 height: 100%;
-min-height: 150px;
+min-height: 180px;
 }
 </style>

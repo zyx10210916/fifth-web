@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import * as echarts from 'echarts';
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, nextTick} from 'vue';
 import type { EChartsOption } from 'echarts'; 
 
 const props = defineProps({
@@ -69,8 +69,8 @@ const getBarOption = (data: any[]): EChartsOption => ({
       fontSize: 12, 
       color: '#666',
       interval: 0,
-      rotate: 25, // 行业名称长，倾斜显示
-      formatter: (val: string) => val.length > 5 ? val.slice(0, 5) + '...' : val
+      rotate: 45, // 行业名称长，倾斜显示
+      formatter: (val: string) => val.length > 20 ? val.slice(0, 20) + '...' : val
     }
   },
   yAxis: {
@@ -97,6 +97,7 @@ const processData = () => {
   const res = props.summaryData;
   if (!res || Object.keys(res).length === 0) return;
 
+  nextTick(()=>{
   // 1. 处理资产情况
   if (res.totalAssets && Array.isArray(res.totalAssets)) {
     const assetsData = res.totalAssets.map((item: any) => ({
@@ -116,13 +117,19 @@ const processData = () => {
     totalProfitSum.value = res.operatingProfit.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
     profitChart?.setOption(getBarOption(profitData));
   }
+  });
 };
 
 onMounted(() => {
-  if (assetChartRef.value) assetChart = echarts.init(assetChartRef.value);
-  if (profitChartRef.value) profitChart = echarts.init(profitChartRef.value);
-  
+nextTick(()=>{
+  if (assetChartRef.value) {
+    assetChart = echarts.init(assetChartRef.value);
+  }
+  if (profitChartRef.value) { 
+    profitChart = echarts.init(profitChartRef.value);
+  }
   processData();
+  });
 
   window.addEventListener('resize', () => {
     assetChart?.resize();
@@ -130,27 +137,38 @@ onMounted(() => {
   });
 });
 
+onUnmounted(()=>{
+  window.removeEventListener('resize', handleResize);
+  assetChart?.dispose();
+  profitChart?.dispose();
+});
+
+const handleResize = () =>{
+  assetChart?.resize();
+  profitChart?.resize();
+}
+
 watch(() => props.summaryData, processData, { deep: true });
 </script>
 
 <style scoped>
 .right-panel {
-  width: 450px;
+  width: 480px;
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 15px;
   box-sizing: border-box;
+  background-color: white;
 }
 
 .item-box {
   flex: 1;
-  background-color: #fff;
-  border-radius: 12px;
+  background-color: white;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  /* box-shadow: 0 2px 10px rgba(0,0,0,0.05); */
 }
 
 .head {

@@ -1,8 +1,8 @@
 <template>
-  <div class="main-content-layout">
+  <div class="main-content">
     <LeftPanel :summary-data="apiData" />
-    <MiddleMap />
-    <RightPanel />
+    <MiddleMap  class="map-center"/>
+    <RightPanel :summary-data="apiData" />
   </div>
 </template>
 
@@ -25,7 +25,7 @@ const fetchData = async (extraParams = {}) => {
       "uniqueCode": "", 
       "area": "", 
       "industryDept": "",
-      "registerType": "100", 
+      "registerType": "", 
       "unitScale": "", 
       "businessOperationType": "",
       "industryCategory": "",
@@ -56,12 +56,21 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* --- 主内容布局样式：三栏 Flexbox --- */
-.main-content-layout {
+.main-content {
   display: flex;
   height: 100%; 
-  gap: 10px;
+  gap: 0px;
   padding: 0;
-  overflow: hidden; 
+  overflow: hidden;
+}
+
+:deep(.middle-map-container){
+  flex:1;
+  min-width: 0;
+  height:100%;
+}
+.map-center{
+  flex:1;
+  min-width: 0;
 }
 </style>
