@@ -116,24 +116,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { FILTER_MAP } from './filter-config';
-
-const props = defineProps<{ isVisible: boolean }>();
+ 
+const props = defineProps<{ 
+  isVisible: boolean;
+  currentParams: any;
+}>();
+ 
 const emit = defineEmits(['update:isVisible', 'apply']);
-
+ 
 const categories = [
   { name: '地区' }, { name: '行业部门' }, { name: '注册类型' },
   { name: '单位规模' }, { name: '经营形式' }, { name: '控股情况' }, { name: '行业门类' }
 ];
-
+ 
 const activeCategory = ref(0);
 const scrollContainer = ref<HTMLElement | null>(null);
-
-// 修改：初始化为空数组，实现默认折叠
 const expandedDistricts = ref<string[]>([]);
-
-// 选中项状态
+ 
+// 选中状态
 const selectedAreaCodes = ref<string[]>([]);
 const selectedDepts = ref<string[]>([]);
 const selectedRegTypes = ref<string[]>([]);
@@ -141,19 +143,27 @@ const selectedUnitSizes = ref<string[]>([]);
 const selectedBizTypes = ref<string[]>([]);
 const selectedHoldings = ref<string[]>([]);
 const selectedIndCats = ref<string[]>([]);
+ 
+// 初始化选中状态 
+watch(() => props.isVisible, (visible) => {
+  if (visible && props.currentParams) {
+    const p = props.currentParams;
+    selectedAreaCodes.value = p.area ? p.area.split(',') : [];
+  }
+});
 
 function toggleDistExpand(code: string) {
   const idx = expandedDistricts.value.indexOf(code);
   if (idx > -1) expandedDistricts.value.splice(idx, 1);
   else expandedDistricts.value.push(code);
 }
-
+ 
 function toggle(list: string[], code: string) {
   const i = list.indexOf(code);
   if (i > -1) list.splice(i, 1);
   else list.push(code);
 }
-
+ 
 function scrollToSection(index: number) {
   activeCategory.value = index;
   const target = document.getElementById(`section-${index}`);
@@ -164,7 +174,7 @@ function scrollToSection(index: number) {
     });
   }
 }
-
+ 
 function onScroll() {
   if (!scrollContainer.value) return;
   const containerTop = scrollContainer.value.getBoundingClientRect().top;
@@ -178,13 +188,17 @@ function onScroll() {
     }
   }
 }
-
+ 
 function clearAll() {
-  selectedAreaCodes.value = []; selectedDepts.value = []; selectedRegTypes.value = [];
-  selectedUnitSizes.value = []; selectedBizTypes.value = []; selectedHoldings.value = [];
+  selectedAreaCodes.value = [];
+  selectedDepts.value = [];
+  selectedRegTypes.value = [];
+  selectedUnitSizes.value = [];
+  selectedBizTypes.value = [];
+  selectedHoldings.value = [];
   selectedIndCats.value = [];
 }
-
+ 
 function apply() {
   emit('apply', {
     area: selectedAreaCodes.value.join(','),
@@ -197,8 +211,10 @@ function apply() {
   });
   closeModal();
 }
-
-function closeModal() { emit('update:isVisible', false); }
+ 
+function closeModal() { 
+  emit('update:isVisible', false); 
+}
 </script>
 
 <style scoped>
@@ -217,7 +233,6 @@ function closeModal() { emit('update:isVisible', false); }
   border-radius: 12px;
   width: 850px;
   height: 800px;
-  /* 增加高度 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -252,7 +267,7 @@ function closeModal() { emit('update:isVisible', false); }
   overflow: hidden;
 }
 
-/* 左侧导航 - 居中排列 */
+/* 左侧导航 */
 .category-nav {
   width: 140px;
   background: #f8f9fb;
@@ -286,7 +301,7 @@ function closeModal() { emit('update:isVisible', false); }
   background: #546fff;
 }
 
-/* 右侧内容区域 */
+/* 右侧内容 */
 .content-area {
   flex: 1;
   padding: 0 30px;
@@ -363,7 +378,7 @@ function closeModal() { emit('update:isVisible', false); }
   margin-top: 10px;
 }
 
-/* 选项卡（药丸型/胶囊型） */
+/* 选项卡 */
 .filter-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -376,11 +391,9 @@ function closeModal() { emit('update:isVisible', false); }
 
 .option-pill {
   height: 44px;
-  /* 高度调大 */
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 字体居中 */
   background: #f5f7fa;
   border-radius: 22px;
   font-size: 13px;
@@ -404,7 +417,6 @@ function closeModal() { emit('update:isVisible', false); }
   font-weight: bold;
 }
 
-/* 底部按钮大小保持一致 */
 .modal-footer {
   padding: 20px 24px;
   border-top: 1px solid #f0f0f0;
@@ -415,9 +427,7 @@ function closeModal() { emit('update:isVisible', false); }
 
 .action-btn {
   width: 110px;
-  /* 统一宽度 */
   height: 40px;
-  /* 统一高度 */
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;

@@ -92,9 +92,9 @@ export default {
     const mapInitialized = ref(false);
     const labelLayers = shallowRef({});
     const labelVisibility = ref({
-      district: true,
-      town: true,
-      village: true
+      district: false,
+      town: false,
+      village: false
     });
 
     const mapList = [
@@ -103,12 +103,12 @@ export default {
     ];
 
     const layerConfigs = [
-      { id: "building", title: "企业建筑点", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPjianzhuxinxipc38&outputFormat=application%2Fjson" },
-      { id: "house", title: "企业房屋面", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPFWMpc38&outputFormat=application%2Fjson" },
-      { id: "city", title: "市行政区边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPSJpc38&outputFormat=application%2Fjson" },
-      { id: "district", title: "区县行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPQXpc38&outputFormat=application%2Fjson" },
-      { id: "town", title: "镇街行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPZJpc38&outputFormat=application%2Fjson" },
-      { id: "village", title: "村社区行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPCSQpc38&outputFormat=application%2Fjson" }
+      { id: "building", title: "企业建筑点", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPjianzhuxinxipc38&outputFormat=application%2Fjson", defaultVisible: true },
+      { id: "house", title: "企业房屋面", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPFWMpc38&outputFormat=application%2Fjson", defaultVisible: false },
+      { id: "city", title: "市行政区边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPSJpc38&outputFormat=application%2Fjson", defaultVisible: true },
+      { id: "district", title: "区县行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPQXpc38&outputFormat=application%2Fjson", defaultVisible: true },
+      { id: "town", title: "镇街行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPZJpc38&outputFormat=application%2Fjson", defaultVisible: false },
+      { id: "village", title: "村社区行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPCSQpc38&outputFormat=application%2Fjson", defaultVisible: false }
     ];
 
     const economicLayers = computed(() => layers.value.filter(l => l.type === "economic"));
@@ -289,15 +289,16 @@ export default {
               }
             },
           spatialReference: { wkid: 4526 },
-          visible: true
+          visible: config.defaultVisible // 使用配置的默认可见性 
         });
 
-        layers.value.push({ id: config.id, title: config.title, visible: true, instance: layer, type: config.type });
-
-        // 为边界图层创建对应的文本标注层
-        if (config.type === "boundary" && config.id !== 'city') {
-          await createLabelLayer(config.id, data.features, mapModules.value);
-        }
+        layers.value.push({
+          id: config.id,
+          title: config.title,
+          visible: config.defaultVisible, // 同步到UI控制 
+          instance: layer,
+          type: config.type
+        });
 
         return layer;
       } catch (e) {
@@ -309,41 +310,45 @@ export default {
     // 异步加载图层 
     const loadLayersSequentially = async (map) => {
       try {
-        // 1. 首先加载市区边界
-        const cityLayer = await createJsonLayer(layerConfigs.find(l => l.id === 'city'));
-        if (cityLayer) map.add(cityLayer);
+        // 1. 首先加载默认需要显示的图层 
+        const defaultVisibleConfigs = layerConfigs.filter(c => c.defaultVisible);
+        const defaultLayerPromises = defaultVisibleConfigs.map(config => createJsonLayer(config));
 
-        // 2. 加载区县
-        const districtLayer = await createJsonLayer(layerConfigs.find(l => l.id === 'district'));
-        if (districtLayer) map.add(districtLayer);
+        // 等待默认图层加载完成
+        const defaultLayers = await Promise.all(defaultLayerPromises);
 
-        // 3. 加载镇街
-        const townLayer = await createJsonLayer(layerConfigs.find(l => l.id === 'town'));
-        if (townLayer) map.add(townLayer);
+        // 添加到地图
+        defaultLayers.forEach(layer => {
+          if (layer) map.add(layer);
+        });
 
-        // 4. 加载村居（包含标注信息）
-        const villageLayer = await createJsonLayer(layerConfigs.find(l => l.id === 'village'));
-        if (villageLayer) {
-          map.add(villageLayer);
-
-          // 异步创建标注图层
-          createLabelsAsync(villageLayer, map);
-        }
-
-        // 5. 加载房屋面
-        const houseLayer = await createJsonLayer(layerConfigs.find(l => l.id === 'house'));
-        if (houseLayer) map.add(houseLayer);
-
-        // 6. 加载建筑点
-        const buildingLayer = await createJsonLayer(layerConfigs.find(l => l.id === 'building'));
-        if (buildingLayer) map.add(buildingLayer);
-
+        // 2. 默认图层加载完成后，隐藏加载进度条
         loading.value = false;
+
+        // 3. 异步加载其他图层（不添加到地图）
+        const otherConfigs = layerConfigs.filter(c => !c.defaultVisible);
+        otherConfigs.forEach(config => {
+          createJsonLayer(config).then(layer => {
+            // 在layers数组中已经保存了图层信息，用户勾选时会动态添加 
+            console.log(`${config.title} 数据已加载但未添加到地图`);
+          });
+        });
+
+        // 4. 异步创建标注图层（默认不显示）
+        const villageConfig = layerConfigs.find(l => l.id === 'village');
+        if (villageConfig) {
+          createJsonLayer(villageConfig).then(villageLayer => {
+            if (villageLayer) {
+              createLabelsAsync(villageLayer, map);
+            }
+          });
+        }
       } catch (error) {
         console.error("图层加载失败:", error);
         loading.value = false;
       }
     };
+
     // 异步创建标注图层的函数
     const createLabelsAsync = async (villageLayer, map) => {
       try {
@@ -431,7 +436,35 @@ export default {
 
     const updateLayerVisibility = (layer) => {
       const target = view.value?.map.findLayerById(layer.id);
-      if (target) target.visible = layer.visible;
+
+      if (!target && layer.visible) {
+        // 如果图层尚未添加到地图且用户勾选了可见性 
+        const config = layerConfigs.find(c => c.id === layer.id);
+        if (config) {
+          // 如果图层已创建但未添加到地图
+          const existingLayer = layers.value.find(l => l.id === config.id)?.instance;
+          if (existingLayer) {
+            view.value.map.add(existingLayer);
+            // 如果是村边界图层且需要创建标注 
+            if (config.type === "boundary" && config.id === 'village') {
+              createLabelsAsync(existingLayer, view.value.map);
+            }
+          } else {
+            // 如果图层尚未创建，则创建并添加 
+            createJsonLayer(config).then(newLayer => {
+              if (newLayer) {
+                view.value.map.add(newLayer);
+                if (config.type === "boundary" && config.id === 'village') {
+                  createLabelsAsync(newLayer, view.value.map);
+                }
+              }
+            });
+          }
+        }
+      } else if (target) {
+        // 如果图层已存在于地图中，直接更新可见性 
+        target.visible = layer.visible;
+      }
     };
 
     const updateBasemapVisibility = () => {

@@ -21,20 +21,29 @@
       </div>
     </div>
 
-    <div class="content-area">
-      <component :is="activeComponent" :filter-params="filterParams" class="tab-content" />
+    <div class="content">
+      <component 
+    :is="activeComponent" 
+    :filter-params="filterParams" 
+    @update-params="handleFilterApply" 
+  />
     </div>
 
-    <FilterModal v-model:is-visible="filterVisible" @apply="handleFilterApply" />
+    <FilterModal 
+    v-model:is-visible="filterVisible"
+    :current-params="filterParams"  
+    @apply="handleFilterApply"
+  />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed } from 'vue';
 import { FilterOutlined } from '@ant-design/icons-vue';
 import FilterModal from './filter.vue';
 import SummaryDisplay from './summary-display/index.vue';
 import UnitHeatmap from './unit-heatmap/index.vue';
+import DataComparison from './data-comparison/index.vue';
 
 const activeTabKey = ref('summary');
 const filterVisible = ref(false);
@@ -42,7 +51,8 @@ const filterParams = ref({}); // 初始值为空对象
 
 const componentMap = {
   summary: SummaryDisplay,
-  heatmap: UnitHeatmap
+  heatmap: UnitHeatmap,
+  comparison: DataComparison,
 };
 
 const activeComponent = computed(() => componentMap[activeTabKey.value]);
@@ -56,23 +66,8 @@ const showFilterModal = () => {
 };
 
 const handleFilterApply = (filters: any) => {
-  console.log('接收到筛选条件并更新引用:', filters);
   filterParams.value = { ...filters };
 };
-
-const route = useRoute()
-
-onMounted(()=>{
-  nextTick(()=> {
-    document.body.clientHeight
-  })
-})
-
-watch(()=> route.path, () =>{
-  nextTick(()=>{
-    document.body.clientHeight
-  })
-})
 </script>
 
 <style scoped lang="less">
@@ -81,7 +76,9 @@ watch(()=> route.path, () =>{
   flex-direction: column;
   height: 100%;
   background: #f5f5f5;
-  padding: 0 ;
+  box-sizing: border-box;
+  padding: 0 10px !important;
+  overflow: hidden;
 }
  
 .tabs-head {
@@ -96,6 +93,8 @@ watch(()=> route.path, () =>{
   border-radius: 6px;
   position: relative;
   padding-bottom: 2px;
+  margin-top: 15px;
+  width: 100%;
  
   .tabs-wrapper {
     flex: 1;
@@ -106,8 +105,6 @@ watch(()=> route.path, () =>{
     display: flex;
     align-items: center;
     gap: 1.2rem;
-    padding-right: 1.6rem;
-    margin-right: 20px;
  
     .filter-btn {
       background-color: #373737;
@@ -172,18 +169,16 @@ watch(()=> route.path, () =>{
   }
 }
  
-.content-area {
+.content {
+  height: calc(100%-75px);
+  width: calc(100%-1
+  5px);
   flex: 1;
   overflow: hidden;
   padding: 15px 0 !important;
   display: flex;
   flex-direction: column;
   margin: 0;
-
-  .left {
-    padding-left: 0;
-    width: calc(100%-0px);
-  }
 }
 
 

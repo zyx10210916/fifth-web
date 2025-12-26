@@ -1,16 +1,14 @@
 <template>
   <div class="main-content-layout">
     <LeftPanel :summary-data="apiData" />
-    <MiddleMap class="map-center" />
-    <RightPanel :summary-data="apiData" />
+    <RightMap class="map-center" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import LeftPanel from '../summary-display/left-stats/index.vue';
-import MiddleMap from './middle-map/index.vue';
-import RightPanel from '../summary-display/right-stats/index.vue';
+import LeftPanel from './left-list/index.vue';
+import RightMap from './right-map/index.vue';
 import { getGsSumDataDisplay } from '@/api/data-display';
 
 const props = defineProps<{
@@ -25,7 +23,7 @@ const fetchData = async (extraParams = {}) => {
       "uniqueCode": "",
       "area": "",
       "industryDept": "",
-      "registerType": "100", // 保持默认值
+      "registerType": "", 
       "unitScale": "",
       "businessOperationType": "",
       "industryCategory": "",
