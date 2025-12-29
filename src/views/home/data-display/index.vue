@@ -111,7 +111,7 @@ const handleFilterApply = (filters: any) => {
       color: white;
       border-radius: 2rem;
       border: none;
-      font-size: 1.4rem;
+      font-size: 18px;
       padding: 0 1.5rem;
       height: 2.8rem;
       display: flex;
@@ -137,7 +137,7 @@ const handleFilterApply = (filters: any) => {
   height: 60px;
  
   :deep(.ant-tabs-tab) {
-    font-size: 1.4rem;
+    font-size:18px;
     padding: 1.2rem 0;
   }
 }
@@ -152,7 +152,7 @@ const handleFilterApply = (filters: any) => {
   .ant-tabs-tab {
     padding: 16px 0 !important;
     color: rgb(113 113 113 / 100%);
-    font-size: 1.6rem;
+    font-size: 20px;
     margin: 0 1.6rem;
  
     &.ant-tabs-tab-active {

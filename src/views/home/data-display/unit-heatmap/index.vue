@@ -1,6 +1,10 @@
 <template>
   <div class="main-content-layout">
-    <LeftPanel :summary-data="apiData" />
+    <LeftPanel 
+      :list-data="unitListData" 
+      :loading="loading"
+      @change-page="handlePageChange"
+    />
     <RightMap class="map-center" />
   </div>
 </template>
@@ -9,60 +13,67 @@
 import { ref, onMounted, watch } from 'vue';
 import LeftPanel from './left-list/index.vue';
 import RightMap from './right-map/index.vue';
-import { getGsSumDataDisplay } from '@/api/data-display';
+import { getUnitHeatMap } from '@/api/data-display'; 
 
 const props = defineProps<{
   filterParams?: any;
 }>();
 
-const apiData = ref({});
+const unitListData = ref({
+  list: [],
+  total: 0,
+  pageNum: 1,
+  pageSize: 20
+});
+const loading = ref(false);
 
-const fetchData = async (extraParams = {}) => {
+const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
+  loading.value = true;
   try {
     const params = {
+      "pageNum": pageNum,
+      "pageSize": 20,
       "uniqueCode": "",
       "area": "",
       "industryDept": "",
-      "registerType": "", 
-      "unitScale": "",
-      "businessOperationType": "",
-      "industryCategory": "",
-      "holdingSituation": "",
       ...extraParams
     };
-
-    console.log('--- 热力图页面发起筛选请求 ---', params);
-    const res = await getGsSumDataDisplay(params);
+    
+    const res = await getUnitHeatMap(params);
     if (res && res.data) {
-      apiData.value = res.data;
+      unitListData.value = res.data;
     }
   } catch (error) {
-    console.error('获取热力图统计数据失败:', error);
+    console.error('获取单位热力图列表失败:', error);
+  } finally {
+    loading.value = false;
   }
 };
 
-// 2. 监听筛选参数深度变化
+// 分页切换
+const handlePageChange = (page: number) => {
+  fetchUnitList(page, props.filterParams || {});
+};
+
+// 监听筛选参数变化
 watch(() => props.filterParams, (newVal) => {
-  // 即使是空对象也尝试请求，或者加个判断
-  fetchData(newVal || {});
+  fetchUnitList(1, newVal || {});
 }, { deep: true });
 
 onMounted(() => {
-  fetchData(props.filterParams || {});
+  fetchUnitList(1, props.filterParams || {});
 });
 </script>
 
 <style scoped>
-/* --- 主内容布局样式：三栏 Flexbox --- */
 .main-content-layout {
   display: flex;
-  height: 100%;
-  gap: 15px;
-  padding: 15px;
-  box-sizing: border-box;
-  background-color: #f0f2f5;
+  height: 100%; 
+  width: 100%;
+  gap: 0px;
+  padding: 0;
+  overflow: hidden;
 }
-
 .map-center {
   flex: 1;
   min-width: 0;
