@@ -4,21 +4,28 @@
       :list-data="unitListData" 
       :loading="loading"
       @change-page="handlePageChange"
+      @row-click="handleRowClick"
     />
-    <RightMap class="map-center" />
+    <RightMap 
+      ref="mapRef" 
+      class="map-center" 
+      :selected-unit="selectedUnit"
+    />
   </div>
 </template>
-
+ 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import LeftPanel from './left-list/index.vue';
 import RightMap from './right-map/index.vue';
 import { getUnitHeatMap } from '@/api/data-display'; 
-
+ 
 const props = defineProps<{
   filterParams?: any;
 }>();
-
+ 
+const mapRef = ref();
+const selectedUnit = ref<any>(null);
 const unitListData = ref({
   list: [],
   total: 0,
@@ -26,7 +33,7 @@ const unitListData = ref({
   pageSize: 20
 });
 const loading = ref(false);
-
+ 
 const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
   loading.value = true;
   try {
@@ -49,22 +56,31 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
     loading.value = false;
   }
 };
-
-// 分页切换
+ 
+// 处理表格行点击
+const handleRowClick = (row: any) => {
+  selectedUnit.value = row;
+  // 调用地图组件的方法定位到该点 
+  if (mapRef.value) {
+    mapRef.value.highlightUnit(row);
+  }
+};
+ 
+// 分页切换 
 const handlePageChange = (page: number) => {
   fetchUnitList(page, props.filterParams || {});
 };
-
-// 监听筛选参数变化
+ 
+// 监听筛选参数变化 
 watch(() => props.filterParams, (newVal) => {
   fetchUnitList(1, newVal || {});
 }, { deep: true });
-
+ 
 onMounted(() => {
   fetchUnitList(1, props.filterParams || {});
 });
 </script>
-
+ 
 <style scoped>
 .main-content-layout {
   display: flex;

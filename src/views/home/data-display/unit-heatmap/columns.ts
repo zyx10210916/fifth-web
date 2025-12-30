@@ -6,11 +6,11 @@ export interface FieldColumn {
 
 export const UNIT_COLUMNS: FieldColumn[] = [
   // 默认展示的核心字段
-  { label: '唯一码', prop: 'WYM', fixed: true },
   { label: '单位名称', prop: 'B102', fixed: true },
   { label: '统一社会信用代码', prop: 'B109', fixed: true },
   
   // 基础身份信息
+  { label: '唯一码', prop: 'WYM'},
   { label: '顺序号', prop: 'rowid' },
   { label: '所属套表', prop: 'tb' },
   { label: '数据来源', prop: 'sjly' },
@@ -39,6 +39,7 @@ export const UNIT_COLUMNS: FieldColumn[] = [
   { label: '负债合计', prop: 'fzhj' },
   { label: '营业收入', prop: 'yysr' },
   { label: '期末人数', prop: 'qmrs' },
+  { label: '从业人数', prop: 'cyrs' },
   { label: '应付职工薪酬', prop: 'yfzgxc' },
   { label: '应交增值税', prop: 'yjzzs' }
 ];

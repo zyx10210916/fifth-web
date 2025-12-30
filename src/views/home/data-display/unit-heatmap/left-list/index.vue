@@ -28,13 +28,14 @@
     </div>
 
     <div class="table-content" v-loading="loading">
-      <el-table 
+       <el-table 
         :data="listData.list" 
         stripe 
         style="width: 100%" 
         height="100%"
         :header-cell-style="{ background: '#f5f7fa', color: '#606266' }"
-      >
+        @row-click="handleRowClick"
+       >
         <el-table-column type="index" label="序号" width="65" align="center" fixed="left" />
         
         <template v-for="col in activeColumns" :key="col.prop">
@@ -81,7 +82,12 @@ const props = defineProps<{
   loading: boolean;
 }>();
 
-const emit = defineEmits(['change-page']);
+const emit = defineEmits(['change-page', 'row-click']);
+
+// 行点击处理
+const handleRowClick = (row: any) => {
+  emit('row-click', row);
+};
 
 // --- 字段显隐逻辑 ---
 const fieldSearchText = ref('');
