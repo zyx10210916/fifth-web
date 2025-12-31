@@ -1,7 +1,7 @@
 <template>
   <div class="main-content">
     <LeftPanel :summary-data="apiData" />
-    <MiddleMap  class="map-center"/>
+    <MiddleMap  class="map-center" @map-select="handleMapSelectChange"/>
     <RightPanel :summary-data="apiData" />
   </div>
 </template>
@@ -18,11 +18,12 @@ const props = defineProps<{
 }>();
 
 const apiData = ref({});
+const currentUniqueCode = ref("");
 
 const fetchData = async (extraParams = {}) => {
   try {
     const params = {
-      "uniqueCode": "", 
+      "uniqueCode": currentUniqueCode.value, 
       "area": "", 
       "industryDept": "",
       "registerType": "", 
@@ -43,7 +44,13 @@ const fetchData = async (extraParams = {}) => {
   }
 };
 
-// 监听筛选参数深度变化
+// 处理地图拉框选中的回调
+const handleMapSelectChange = (codes: string) => {
+  currentUniqueCode.value = codes;
+  fetchData(props.filterParams || {});
+};
+
+// 监听顶部/侧边筛选框变化
 watch(() => props.filterParams, (newVal) => {
   if (newVal) {
     fetchData(newVal);
@@ -59,6 +66,7 @@ onMounted(() => {
 .main-content {
   display: flex;
   height: 100%; 
+  width: 100%;
   gap: 0px;
   padding: 0;
   overflow: hidden;

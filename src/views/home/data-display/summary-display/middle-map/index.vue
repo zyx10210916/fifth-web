@@ -17,7 +17,7 @@
         </li>
       </ul>
 
-      <MapTools :view="view" @select-complete="handleSelectionComplete" />
+     <MapTools :view="view" @select-complete="handleMapSelection" />
 
       <div class="layer-tree-panel">
         <div class="panel-header">
@@ -80,7 +80,7 @@ import yxtActive from "@/assets/images/yxt-2.png";
 export default {
   name: 'ArcGISFeatureLayerJsonMix',
   components: { MapTools },
-  setup() {
+  setup(props, { emit }) {
     const view = shallowRef(null);
     const panelVisible = ref(true);
     const layers = ref([]);
@@ -103,7 +103,7 @@ export default {
     ];
 
     const layerConfigs = [
-      { id: "building", title: "企业建筑点", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPjianzhuxinxipc38&outputFormat=application%2Fjson", defaultVisible: true },
+      { id: "building", title: "企业建筑点", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3Agongbaokuqiyedianpc38_1&maxFeatures=5000&outputFormat=application%2Fjson", defaultVisible: true },
       { id: "house", title: "企业房屋面", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPFWMpc38&outputFormat=application%2Fjson", defaultVisible: false },
       { id: "city", title: "市行政区边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPSJpc38&outputFormat=application%2Fjson", defaultVisible: true },
       { id: "district", title: "区县行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPQXpc38&outputFormat=application%2Fjson", defaultVisible: true },
@@ -386,6 +386,12 @@ export default {
       });
     };
 
+    const handleMapSelection = (uniqueCodeStr) => {
+      console.log('地图中转层接收到代码:', uniqueCodeStr);
+      // 将事件继续向上抛给 summary-diaplay/index.vue
+      emit('map-select', uniqueCodeStr); 
+    };
+
     onMounted(async () => {
       try {
         const modules = await loadModules([
@@ -411,18 +417,23 @@ export default {
           layers: [] // 初始为空，逐步添加图层 
         });
 
+        // 确保 SpatialReference 被实例化了
+        const sr = new SpatialReference({ wkid: 4526 });
+
         view.value = new MapView({
           container: "viewDiv",
           map: map,
-          spatialReference: new SpatialReference({ wkid: 4526 }),
+          spatialReference: sr, // 使用实例化的对象
           extent: {
-            xmin: 38392997.07, ymin: 2495903.35, xmax: 38505644.28, ymax: 2648163.20,
-            spatialReference: { wkid: 4526 }
+            xmin: 38392997.07, 
+            ymin: 2495903.35, 
+            xmax: 38505644.28, 
+            ymax: 2648163.20,
+            spatialReference: sr // 这里也要带上
           },
           ui: { components: [] }
         });
-
-        window.view = view.value;
+                window.view = view.value;
 
         mapInitialized.value = true;
 
@@ -492,8 +503,9 @@ export default {
       view, panelVisible, economicLayers, boundaryLayers, mapList,
       activeBasemapId, basemapVisible, loading, loadingText, labelVisibility,
       handleBasemapChange,
+      handleMapSelection,
       updateLayerVisibility, updateBasemapVisibility, updateLabelVisibility, togglePanel,
-      handleSelectionComplete: (g) => console.log('选择完成:', g)
+      handleSelectionComplete: handleMapSelection
     };
   }
 };

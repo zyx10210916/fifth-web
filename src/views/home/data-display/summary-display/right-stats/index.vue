@@ -1,5 +1,5 @@
 <template>
-  <aside class="right-panel">
+  <aside class="right">
     <div class="item-box">
       <div class="head">
         <span>资产情况</span>
@@ -66,7 +66,7 @@ const getBarOption = (data: any[]): EChartsOption => ({
     axisLine: { lineStyle: { color: '#eee' } },
     axisTick: { show: false },
     axisLabel: { 
-      fontSize: 12, 
+      fontSize: 14, 
       color: '#666',
       interval: 0,
       rotate: 45, // 行业名称长，倾斜显示
@@ -76,7 +76,7 @@ const getBarOption = (data: any[]): EChartsOption => ({
   yAxis: {
     type: 'value',
     splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
-    axisLabel: { fontSize: 12, color: '#999' }
+    axisLabel: { fontSize: 16, color: '#999' }
   },
   series: [{
     type: 'bar',
@@ -152,7 +152,7 @@ watch(() => props.summaryData, processData, { deep: true });
 </script>
 
 <style scoped>
-.right-panel {
+.right {
   width: 480px;
   height: 100%;
   display: flex;
