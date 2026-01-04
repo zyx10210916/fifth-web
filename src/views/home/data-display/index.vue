@@ -7,7 +7,6 @@
           <a-tab-pane key="comparison" tab="数据比对展示" />
           <a-tab-pane key="heatmap" tab="单位热力图" />
           <a-tab-pane key="building" tab="建筑物展示" />
-          <a-tab-pane key="custom" tab="自定义区域汇总" />
         </a-tabs>
       </div>
 
