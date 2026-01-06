@@ -2,7 +2,7 @@
   <div class="main-content-layout">
     <LeftPanel 
       :list-data="unitListData" 
-      :loading="loading"
+      :loading="listLoading"
       @change-page="handlePageChange"
       @row-click="handleRowClick"
     />
@@ -10,7 +10,8 @@
       ref="mapRef" 
       class="map-center" 
       :selected-unit="selectedUnit"
-      :unit-list-data="unitListData"
+      :map-points-data="mapPointsData"
+      :loading="mapLoading"
     />
   </div>
 </template>
@@ -19,7 +20,7 @@
 import { ref, onMounted, watch } from 'vue';
 import LeftPanel from './left-list/index.vue';
 import RightMap from './right-map/index.vue';
-import { getUnitHeatMap } from '@/api/data-display'; 
+import { getUnitHeatMap, getBulletinList } from '@/api/data-display'; 
  
 const props = defineProps<{
   filterParams?: any;
@@ -33,24 +34,25 @@ const unitListData = ref({
   pageNum: 1,
   pageSize: 20
 });
-const loading = ref(false);
+const mapPointsData = ref([]);
+const listLoading = ref(false);
+const mapLoading = ref(false);
  
+// 左侧列表数据请求 
 const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
-  loading.value = true;
+  listLoading.value = true;
   try {
     const params = {
-      pageNum: pageNum,
+      pageNo: pageNum,
       pageSize: 20,
-      ...extraParams
+      ...extraParams 
     };
     
-    console.log('发送请求参数:', params); // 调试 
     const res = await getUnitHeatMap(params);
-    console.log('收到响应数据:', res?.data); // 调试
     
     if (res?.data) {
       unitListData.value = {
-        list: res.data.list, // 完全替换列表数据
+        list: res.data.list,
         total: res.data.total,
         pageNum: pageNum,
         pageSize: 20 
@@ -59,14 +61,48 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
   } catch (error) {
     console.error('获取单位热力图列表失败:', error);
   } finally {
-    loading.value = false;
+    listLoading.value = false;
+  }
+};
+ 
+// 右侧地图数据请求
+const fetchMapPoints = async (extraParams = {}) => {
+  mapLoading.value = true;
+  try {
+    const res = await getBulletinList({
+      pageNo: 1,
+      pageSize: 1000, 
+      ...extraParams 
+    });
+    
+    if (res?.data?.list) {
+      mapPointsData.value = res.data.list.map(item => ({
+        ...item,
+        XZ_AXIS: item.XZ_AXIS,
+        YZ_AXIS: item.YZ_AXIS,
+        B109: item.B109,
+        WYM: item.WYM, 
+        ZCZJ: item.ZCZJ,
+        ZYSR: item.ZYSR,
+        QMRS: item.QMRS,
+        CYRS: item.CYRS 
+      }));
+    }
+  } catch (error) {
+    console.error('获取地图点位数据失败:', error);
+  } finally {
+    mapLoading.value = false;
   }
 };
  
 const handleRowClick = (row: any) => {
-  selectedUnit.value = row;
+  selectedUnit.value = {
+    WYM: row.WYM,
+    B102: row.B102,
+    B109: row.B109
+  };
   if (mapRef.value) {
-    mapRef.value.highlightUnit(row);
+    mapRef.value.highlightUnit(selectedUnit.value);
   }
 };
  
@@ -76,10 +112,12 @@ const handlePageChange = (page: number) => {
  
 watch(() => props.filterParams, (newVal) => {
   fetchUnitList(1, newVal || {});
+  fetchMapPoints(newVal || {});
 }, { deep: true });
  
 onMounted(() => {
   fetchUnitList(1, props.filterParams || {});
+  fetchMapPoints(props.filterParams || {});
 });
 </script>
  

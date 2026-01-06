@@ -4,7 +4,8 @@ import { post } from '@/utils/http/axios';
 enum URL {
   getGsSumDataDisplay = '/api/api-form/form/fifth/gs/getGsSumDataDisplay',
   getDataComparison = '/api/api-form/form/fifth/gs/getDataComparison',
-  getUnitHeatMap = '/api/api-form/form/fifth/gs/getUnitHeatMap'
+  getUnitHeatMap = '/api/api-form/form/fifth/gs/getUnitHeatMap',
+  getBulletinList = '/api/api-form/form/fifth/gs/getBulletinList',
 }
 
 // 封装请求方法
@@ -13,7 +14,7 @@ export const getGsSumDataDisplay = (data: any) => {
     url: URL.getGsSumDataDisplay,
     data,
     headers: {
-      'needToken_': 'true' 
+      'needToken_': 'true'
     }
   });
 };
@@ -23,7 +24,7 @@ export const getDataComparison = (data: any) => {
     url: URL.getDataComparison,
     data,
     headers: {
-      'needToken_': 'true' 
+      'needToken_': 'true'
     }
   });
 };
@@ -33,7 +34,17 @@ export const getUnitHeatMap = (data: any) => {
     url: URL.getUnitHeatMap,
     data,
     headers: {
-      'needToken_': 'true' 
+      'needToken_': 'true'
+    }
+  });
+};
+
+export const getBulletinList = (data: any) => {
+  return post<any>({
+    url: URL.getBulletinList,
+    data,
+    headers: {
+      'needToken_': 'true'
     }
   });
 };
