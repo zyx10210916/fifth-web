@@ -61,13 +61,17 @@ import dtNormal from "@/assets/images/dt-1.png";
 import dtActive from "@/assets/images/dt-2.png";
 import yxtNormal from "@/assets/images/yxt-1.png";
 import yxtActive from "@/assets/images/yxt-2.png";
-
+ 
 export default {
   name: 'ArcGISHeatmapPro',
   props: {
     selectedUnit: {
       type: Object,
       default: null
+    },
+    unitListData: {
+      type: Object,
+      default: () => ({ list: [] })
     }
   },
   setup(props, { expose }) {
@@ -77,50 +81,31 @@ export default {
     const loading = ref(true);
     const loadingText = ref('正在初始化地图...');
     const layers = ref([]);
-    const selectedHeatmapField = ref("qmrs");
+    const selectedHeatmapField = ref("QMRS"); // 改为大写
     const activeBasemapId = ref('street');
     const highlightGraphic = shallowRef(null);
-
+ 
+    // 字段名改为大写
     const fieldOptions = ref([
-      { value: "qmrs", label: "期末人数", type: "Long" },
-      { value: "zczj", label: "资产总计", type: "Double" },
-      { value: "zysr", label: "主营收入", type: "Integer" },
-      { value: "cyrs", label: "从业人数", type: "Integer" }
+      { value: "QMRS", label: "期末人数", type: "Long" },
+      { value: "ZCZJ", label: "资产总计", type: "Double" },
+      { value: "ZYSR", label: "主营收入", type: "Double" }, 
+      { value: "CYRS", label: "从业人数", type: "Integer" }
     ]);
-
+ 
     const currentFieldLabel = computed(() => {
       if (!selectedHeatmapField.value) return "仅按分布密度";
       const field = fieldOptions.value.find(f => f.value === selectedHeatmapField.value);
       return field ? field.label : "未知字段";
     });
-
+ 
     const mapList = [
       { id: 'street', name: '地图', className: 'mapType-normal', imgNormal: dtNormal, imgActive: dtActive },
       { id: 'satellite', name: '影像图', className: 'mapType-image', imgNormal: yxtNormal, imgActive: yxtActive }
     ];
-
-    const layerConfigs = [
-      {
-        id: "building_points",
-        title: "企业建筑点",
-        url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows",
-        typeName: "dataCenterWorkspace:gongbaokuqiyedianpc38_1",
-        pageSize: 20000,  // 每页加载20000条
-        rendererType: "simple"
-      },
-      {
-        id: "heatmap_layer",
-        title: "热力图",
-        url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows",
-        typeName: "dataCenterWorkspace:gongbaokuqiyedianpc38_1",
-        pageSize: 20000,  // 每页加载20000条 
-        rendererType: "heatmap"
-      }
-    ];
-
-    // 渲染器创建函数
+ 
     const createHeatmapRenderer = (fieldName) => {
-      const isMoneyField = ["zczj", "zysr"].includes(fieldName);
+      const isMoneyField = ["ZCZJ", "ZYSR"].includes(fieldName);
       return {
         type: "heatmap",
         field: fieldName || null,
@@ -136,194 +121,202 @@ export default {
         minPixelIntensity: 0
       };
     };
-
+ 
     const createSimpleRenderer = () => {
       return {
         type: "simple",
         symbol: {
           type: "simple-marker",
-          color: [226, 119, 40],  // 橙色
+          color: [226, 119, 40],  // 橙色 
           outline: {
             color: [255, 255, 255],
-            width: 1
+            width: 1 
           },
-          size: 6
+          size: 6 
         }
       };
     };
-
-    // 加载GeoJSON图层
-    const loadGeoJsonLayer = async (config, map) => {
+ 
+    const loadBuildingPoints = async (map) => {
       try {
-        loadingText.value = `正在加载 ${config.title} 数据...`;
+        loadingText.value = '正在加载企业建筑点数据...';
         loading.value = true;
-
+     
         const [FeatureLayer, Graphic] = mapModules.value;
-        let allGraphics = [];
-        let currentMinId = 0;
-        const pageSize = 20000; // 每次加载20000条 
-        let hasMoreData = true;
-        let lastCount = 0;
-
-        // 分页加载所有数据 
-        while (hasMoreData) {
-          loadingText.value = `正在加载 ${config.title} 数据 (已加载 ${currentMinId} 条)...`;
-
-          // 使用CQL_FILTER基于OBJECTID分页 
-          const pageUrl = `${config.url}?service=WFS&version=1.0.0&request=GetFeature` +
-            `&typeName=${config.typeName}&outputFormat=application/json` +
-            `&cql_filter=OBJECTID>=${currentMinId} AND OBJECTID<${currentMinId + pageSize}`;
-
-          const response = await fetch(pageUrl);
-          const data = await response.json();
-
-          if (!data.features || data.features.length === 0) {
-            // 如果连续5次获取到空数据，则认为已经加载完毕 
-            if (lastCount >= 5) {
-              hasMoreData = false;
-            } else {
-              lastCount++;
-              currentMinId += pageSize;
-            }
-          } else {
-            lastCount = 0;
-            const pageGraphics = data.features.map((f, index) => {
-              const coords = f.geometry.coordinates;
-              const attributes = {
-                ...f.properties,
-                custom_oid: currentMinId + index,
-                // 确保数值字段是数字类型 
-                ...Object.fromEntries(
-                  fieldOptions.value.map(field => [
-                    field.value,
-                    Number(f.properties[field.value]) || 0
-                  ])
-                )
-              };
-
-              return new Graphic({
-                geometry: {
-                  type: "point",
-                  x: coords[0],
-                  y: coords[1],
-                  spatialReference: { wkid: 4526 }
-                },
-                attributes: attributes
-              });
-            });
-
-            allGraphics = [...allGraphics, ...pageGraphics];
-            currentMinId += pageSize;
-          }
-
-          // 热力图优化：每加载10万条就更新一次热力图
-          if (allGraphics.length > 0 && allGraphics.length % 100000 === 0) {
-            await updatePartialHeatmap(allGraphics.slice(-100000));
-          }
+        const buildingData = props.unitListData.list || [];
+        
+        if (buildingData.length === 0) {
+          console.warn('建筑点数据为空');
+          return;
         }
-
-        // 优化热力图更新的辅助函数
-        const updatePartialHeatmap = async (graphics) => {
-          if (!view.value || !graphics.length) return;
-
-          const [FeatureLayer] = mapModules.value;
-          const tempLayer = new FeatureLayer({
-            source: graphics,
-            renderer: createHeatmapRenderer(selectedHeatmapField.value)
+     
+        // 增强调试信息 
+        console.log('原始坐标示例:', {
+          x: buildingData[0]?.XZ_AXIS, 
+          y: buildingData[0]?.YZ_AXIS,
+          type: typeof buildingData[0]?.XZ_AXIS 
+        });
+     
+        const graphics = buildingData.map((item, index) => {
+          // 强制转换为数字并验证 
+          const x = parseFloat(item.XZ_AXIS);
+          const y = parseFloat(item.YZ_AXIS);
+          
+          if (isNaN(x) || isNaN(y)) {
+            console.error('无效坐标:', item);
+            return null;
+          }
+     
+          return new Graphic({
+            geometry: {
+              type: "point",
+              x: x,
+              y: y,
+              spatialReference: { wkid: 4526 }  // 显式指定 
+            },
+            attributes: {
+              ...item,
+              custom_oid: index,
+              B109: item.B109 || '',
+              B102: item.B102 || '',
+              B102_2: item.B102_2 || '' // 添加B102_2字段 
+            }
           });
-
-          // 先移除旧的热力图图层 
-          const oldLayer = view.value.map.findLayerById("heatmap_temp");
-          if (oldLayer) view.value.map.remove(oldLayer);
-
-          // 添加临时热力图图层 
-          tempLayer.id = "heatmap_temp";
-          view.value.map.add(tempLayer);
-        };
-        // 最终创建完整图层
+        }).filter(Boolean);
+     
+        console.log('生成的图形:', graphics.slice(0, 3));
+     
+        // 创建图层时添加完整空间参考
         const layer = new FeatureLayer({
-          id: config.id,
-          title: config.title,
-          source: allGraphics,
+          id: "building_points",
+          title: "企业建筑点",
+          source: graphics,
+          objectIdField: "custom_oid",
           fields: [
             { name: "custom_oid", type: "oid" },
-            ...fieldOptions.value.map(field => ({
-              name: field.value,
-              type: field.type.toLowerCase()
-            })),
             { name: "B109", type: "string" },
-            { name: "b109_2", type: "string" }
+            { name: "B102", type: "string" },
+            { name: "B102_2", type: "string" },
+            { name: "QMRS", type: "integer" },
+            { name: "ZCZJ", type: "double" },
+            { name: "ZYSR", type: "double" },
+            { name: "CYRS", type: "integer" }
           ],
-          objectIdField: "custom_oid",
-          renderer: config.rendererType === "heatmap"
-            ? createHeatmapRenderer(selectedHeatmapField.value)
-            : createSimpleRenderer(),
-          spatialReference: { wkid: 4526 }
+          spatialReference: { wkid: 4526 },  // 再次确认 
+          renderer: {
+            type: "simple",
+            symbol: {
+              type: "simple-marker",
+              color: [226, 119, 40],
+              outline: { color: [255, 255, 255], width: 1 },
+              size: 12  // 增大尺寸便于观察
+            }
+          }
         });
-
+     
+        // 强制刷新视图
+        layer.when(() => {
+          console.log('图层加载完成，执行刷新');
+          view.value.goTo({
+            center: [graphics[0].geometry.x, graphics[0].geometry.y],
+            zoom: 15 
+          }).catch(console.warn);
+        });
+     
         map.add(layer);
-        layers.value = [...layers.value.filter(l => l.id !== config.id), {
-          id: config.id,
-          title: config.title,
-          visible: true,
-          instance: markRaw(layer)
-        }];
-
+        layers.value = [
+          ...layers.value.filter(l => l.id !== "building_points"),
+          { id: "building_points", title: "企业建筑点", visible: true, instance: markRaw(layer) }
+        ];
+     
       } catch (err) {
-        console.error("加载图层出错:", err);
+        console.error("建筑点加载失败:", err);
       } finally {
         loading.value = false;
       }
     };
-
+ 
+    // 修改为使用建筑点数据创建热力图
+    const createHeatmapFromBuildingPoints = async (map) => {
+      try {
+        loadingText.value = '正在生成热力图...';
+        loading.value = true;
+ 
+        const [FeatureLayer] = mapModules.value;
+        const buildingLayer = map.findLayerById("building_points");
+        
+        if (!buildingLayer) {
+          console.warn("未找到建筑点图层");
+          return;
+        }
+ 
+        // 创建热力图图层
+        const heatmapLayer = new FeatureLayer({
+          id: "heatmap_layer",
+          title: "热力图",
+          source: buildingLayer.source, // 直接使用建筑点数据源
+          objectIdField: "custom_oid",
+          fields: buildingLayer.fields,
+          spatialReference: { wkid: 4526 },
+          renderer: createHeatmapRenderer(selectedHeatmapField.value)
+        });
+ 
+        map.add(heatmapLayer);
+        
+        layers.value = [
+          ...layers.value.filter(l => l.id !== "heatmap_layer"),
+          {
+            id: "heatmap_layer",
+            title: "热力图",
+            visible: true,
+            instance: markRaw(heatmapLayer)
+          }
+        ];
+ 
+      } catch (err) {
+        console.error("创建热力图失败:", err);
+      } finally {
+        loading.value = false;
+      }
+    };
+ 
     const removeLayer = (layerId) => {
       if (!view.value) return;
-
+ 
       const map = view.value.map;
       const layer = map.findLayerById(layerId);
       if (layer) {
         map.remove(layer);
       }
-
+ 
       layers.value = layers.value.filter(l => l.id !== layerId);
     };
-
+ 
     const handleFieldChange = async () => {
       if (!view.value) return;
-
-      // 移除旧热力图图层
+ 
       removeLayer("heatmap_layer");
-
-      // 重新创建热力图图层
-      await loadGeoJsonLayer(
-        layerConfigs.find(l => l.id === "heatmap_layer"),
-        view.value.map
-      );
+      await createHeatmapFromBuildingPoints(view.value.map);
     };
-
-    // 高亮并定位到选中单位
+ 
     const highlightAndLocateUnit = async (unit) => {
       if (!unit || !view.value) return;
-
+ 
       try {
         const [Graphic, FeatureLayer] = mapModules.value;
-
-        // 清除之前的高亮
+ 
         if (highlightGraphic.value) {
           view.value.graphics.remove(highlightGraphic.value);
         }
-
-        // 获取建筑点图层
+ 
         const buildingLayer = view.value.map.findLayerById("building_points");
         if (!buildingLayer) return;
-
-        // 查询匹配的点
+ 
         const query = buildingLayer.createQuery();
-        query.where = `B109 = '${unit.B109}' OR b109_2 = '${unit.B109}'`;
+        query.where = `B109 = '${unit.uniqueCode || unit.B109}' OR B102 = '${unit.name || unit.B102}' OR B102_2 = '${unit.name || unit.B102}'`;
         const { features } = await buildingLayer.queryFeatures(query);
-
+ 
         if (features.length > 0) {
-          // 创建高亮点图形
           const highlightSymbol = {
             type: "simple-marker",
             color: [255, 0, 0],  // 红色
@@ -333,25 +326,22 @@ export default {
             },
             size: 12
           };
-
+ 
           highlightGraphic.value = new Graphic({
             geometry: features[0].geometry,
             symbol: highlightSymbol
           });
-
-          // 添加到视图
+ 
           view.value.graphics.add(highlightGraphic.value);
-
-          // 定位到该点
+ 
           await view.value.goTo({
             target: features[0].geometry,
             zoom: 32
           });
-
-          // 显示单位名称弹窗
+ 
           view.value.popup.open({
-            title: unit.B102 || '单位名称',
-            content: `统一社会信用代码: ${unit.B109}`,
+            title: unit.name || unit.B102 || '单位名称',
+            content: `统一社会信用代码: ${unit.uniqueCode || unit.B109}`,
             location: features[0].geometry,
             actions: []
           });
@@ -360,17 +350,25 @@ export default {
         console.error("定位单位失败:", error);
       }
     };
-
-    // 暴露给父组件的方法
+ 
     const locateEnterprise = (unit) => {
       highlightAndLocateUnit(unit);
     };
-
-    // 监听选中单位变化
+ 
     watch(() => props.selectedUnit, (newUnit) => {
       highlightAndLocateUnit(newUnit);
     });
-
+ 
+    watch(() => props.unitListData, (newVal) => {
+      if (view.value && newVal.list) {
+        removeLayer("building_points");
+        removeLayer("heatmap_layer");
+        loadBuildingPoints(view.value.map).then(() => {
+          createHeatmapFromBuildingPoints(view.value.map);
+        });
+      }
+    }, { deep: true });
+ 
     onMounted(async () => {
       try {
         const modules = await loadModules([
@@ -386,11 +384,10 @@ export default {
           url: 'http://192.168.94.114/4.19/init.js',
           css: 'http://192.168.94.114/4.19/esri/themes/light/main.css'
         });
-
+ 
         mapModules.value = modules;
         const [FeatureLayer, Graphic, Map, MapView, SpatialReference, Basemap, TileLayer, Popup] = modules;
-
-        // 初始化地图
+ 
         const map = new Map({
           basemap: new Basemap({
             baseLayers: [new TileLayer({
@@ -398,7 +395,7 @@ export default {
             })]
           })
         });
-
+ 
         view.value = new MapView({
           container: "viewDiv",
           map: map,
@@ -416,37 +413,28 @@ export default {
             }
           }
         });
-
-        // 加载企业建筑点（简单点图层）
-        await loadGeoJsonLayer(
-          layerConfigs.find(l => l.id === "building_points"),
-          map
-        );
-
-        // 加载热力图图层
-        await loadGeoJsonLayer(
-          layerConfigs.find(l => l.id === "heatmap_layer"),
-          map
-        );
-
+ 
+        await loadBuildingPoints(map);
+        await createHeatmapFromBuildingPoints(map);
+ 
       } catch (error) {
         console.error("初始化失败", error);
         loading.value = false;
       }
     });
-
+ 
     const updateLayerVisibility = (layer) => {
       if (layer.instance) {
         layer.instance.visible = layer.visible;
       }
     };
-
+ 
     const handleBasemapChange = (id) => {
       if (!view.value) return;
       const url = id === 'street'
         ? "http://192.168.3.140:6080/arcgis/rest/services/fw_dt/MapServer"
         : "http://192.168.94.114/arcgis/rest/services/GZ2000_ZW_YXDT_2019/MapServer";
-
+ 
       loadModules(['esri/Basemap', 'esri/layers/TileLayer']).then(([Basemap, TileLayer]) => {
         view.value.map.basemap = new Basemap({
           baseLayers: [new TileLayer({ url })]
@@ -454,18 +442,18 @@ export default {
         activeBasemapId.value = id;
       });
     };
-
+ 
     onUnmounted(() => {
       if (view.value) {
         view.value.destroy();
       }
     });
-
-    // 暴露方法给父组件
+ 
     expose({
-      locateEnterprise
+      locateEnterprise,
+      highlightUnit: highlightAndLocateUnit  
     });
-
+ 
     return {
       view,
       panelVisible,
@@ -486,7 +474,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* 样式保持不变 */
 .map-container {
   position: relative;
   width: 100%;

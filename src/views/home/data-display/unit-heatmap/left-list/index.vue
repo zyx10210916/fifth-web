@@ -55,7 +55,7 @@
 
     <div class="pagination-footer">
       <el-pagination
-        v-model:current-page="currentPage"
+        v-model:current-page="listData.pageNum" 
         :page-size="listData.pageSize"
         :total="listData.total"
         :paper-count="5"
@@ -106,12 +106,12 @@ const activeColumns = computed(() => {
 });
 
 // --- 分页逻辑 ---
-const currentPage = ref(1);
+// const currentPage = ref(1);
 
-// 同步 props 的页码
-watch(() => props.listData.pageNum, (newVal) => {
-  currentPage.value = newVal;
-});
+// // 同步 props 的页码
+// watch(() => props.listData.pageNum, (newVal) => {
+//   currentPage.value = newVal;
+// });
 
 const handlePageChange = (page: number) => {
   emit('change-page', page);

@@ -10,6 +10,7 @@
       ref="mapRef" 
       class="map-center" 
       :selected-unit="selectedUnit"
+      :unit-list-data="unitListData"
     />
   </div>
 </template>
@@ -38,17 +39,22 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
   loading.value = true;
   try {
     const params = {
-      "pageNum": pageNum,
-      "pageSize": 20,
-      "uniqueCode": "",
-      "area": "",
-      "industryDept": "",
+      pageNum: pageNum,
+      pageSize: 20,
       ...extraParams
     };
     
+    console.log('发送请求参数:', params); // 调试 
     const res = await getUnitHeatMap(params);
-    if (res && res.data) {
-      unitListData.value = res.data;
+    console.log('收到响应数据:', res?.data); // 调试
+    
+    if (res?.data) {
+      unitListData.value = {
+        list: res.data.list, // 完全替换列表数据
+        total: res.data.total,
+        pageNum: pageNum,
+        pageSize: 20 
+      };
     }
   } catch (error) {
     console.error('获取单位热力图列表失败:', error);
@@ -57,21 +63,17 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
   }
 };
  
-// 处理表格行点击
 const handleRowClick = (row: any) => {
   selectedUnit.value = row;
-  // 调用地图组件的方法定位到该点 
   if (mapRef.value) {
     mapRef.value.highlightUnit(row);
   }
 };
  
-// 分页切换 
 const handlePageChange = (page: number) => {
   fetchUnitList(page, props.filterParams || {});
 };
  
-// 监听筛选参数变化 
 watch(() => props.filterParams, (newVal) => {
   fetchUnitList(1, newVal || {});
 }, { deep: true });
