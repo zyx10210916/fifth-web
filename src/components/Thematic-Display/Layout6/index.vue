@@ -242,7 +242,7 @@ const handleRegionClick = (region) => {
                 flex-direction: column;
                 overflow: hidden;
                 min-height: 0;
-                border: 1px solid #f0f0f0;
+                //border: 1px solid #f0f0f0;
 
                 &.container-1,
                 &.container-2 {
@@ -261,10 +261,10 @@ const handleRegionClick = (region) => {
                   display: flex;
                   align-items: center;
                   justify-content: space-between;
-                  border-bottom: 1px solid #f0f0f0;
+                  //border-bottom: 1px solid #f0f0f0;
 
                   .chart-title {
-                    font-size: 16px;
+                    font-size: 20px;
                     font-weight: 500;
                     color: #262626;
                     margin: 0;

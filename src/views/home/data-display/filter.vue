@@ -134,8 +134,6 @@ const categories = [
 const activeCategory = ref(0);
 const scrollContainer = ref<HTMLElement | null>(null);
 const expandedDistricts = ref<string[]>([]);
- 
-// 选中状态
 const selectedAreaCodes = ref<string[]>([]);
 const selectedDepts = ref<string[]>([]);
 const selectedRegTypes = ref<string[]>([]);
@@ -144,7 +142,6 @@ const selectedBizTypes = ref<string[]>([]);
 const selectedHoldings = ref<string[]>([]);
 const selectedIndCats = ref<string[]>([]);
  
-// 初始化选中状态 
 watch(() => props.isVisible, (visible) => {
   if (visible && props.currentParams) {
     const p = props.currentParams;
@@ -267,7 +264,6 @@ function closeModal() {
   overflow: hidden;
 }
 
-/* 左侧导航 */
 .category-nav {
   width: 140px;
   background: #f8f9fb;
@@ -301,7 +297,6 @@ function closeModal() {
   background: #546fff;
 }
 
-/* 右侧内容 */
 .content-area {
   flex: 1;
   padding: 0 30px;
@@ -321,7 +316,6 @@ function closeModal() {
   margin-bottom: 25px;
 }
 
-/* 地区复选框 */
 .district-group {
   margin-bottom: 15px;
 }
@@ -378,7 +372,6 @@ function closeModal() {
   margin-top: 10px;
 }
 
-/* 选项卡 */
 .filter-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

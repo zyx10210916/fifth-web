@@ -19,7 +19,7 @@
       <h4 class="option-title">下载格式</h4>
       <Select v-model:value="exportFormat" class="format-select">
         <SelectOption value="xlsx">Excel (.xlsx)</SelectOption>
-<!--        <SelectOption value="csv">CSV (.csv)</SelectOption>-->
+        <SelectOption value="csv">CSV (.csv)</SelectOption>
       </Select>
     </div>
   </Modal>

@@ -48,6 +48,8 @@ enum URL {
   findDataQueryPage = 'api/api-form/form/fifth/dataquery/findDataQueryPage',
   //数据导出
   dynamicExportExcel = 'api/api-form/form/fifth/dataquery/exportExcel',
+  //CSV数据导出
+  dynamicExportCsv = 'api/api-form/form/fifth/dataquery/exportCsv',
   //专业列表
   professionalList = 'api/api-form/form/core/formBoList/professional_list/getData?single=false',
   //地区列表
@@ -165,6 +167,7 @@ const professionalList = async (data: getDataData) => post<any>({ url: URL.profe
 const areaList = async (data: getDataData) => post<any>({ url: URL.areaList, data });
 const dataQueryTableList = async (data: getDataData) => post<any>({ url: URL.dataQueryTableList, data });
 const dynamicExportExcel = async (data: getDataData) => post<any>({ url: URL.dynamicExportExcel, data, responseType: 'blob' });
+const dynamicExportCsv = async (data: getDataData) => post<any>({ url: URL.dynamicExportCsv, data, responseType: 'blob' });
 
 /* 二. 快速汇总接口 */
 // 每个列表的表头
@@ -446,4 +449,5 @@ export {
   getDataConditionQueryTemplateList,
   saveDataConditionQueryTemplate,
   dynamicExportExcel,
+  dynamicExportCsv,
 };

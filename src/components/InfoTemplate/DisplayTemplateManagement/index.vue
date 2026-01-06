@@ -221,8 +221,8 @@ const getTemplateList = async () => {
 
 // 分页变化处理
 const handlePaginationChange = (page, pageSize) => {
-  pagination.pageNo = page;
-  pagination.pageSize = pageSize;
+  pagination.pageNo = page.pageNo;
+  pagination.pageSize = page.pageSize;
   getTemplateList();
 };
 

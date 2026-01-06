@@ -1,42 +1,39 @@
 <template>
   <div class="data-display-container">
-    <!-- 横板专题分析菜单 -->
-    <div class="horizontal-menu-container">
-      <a-menu
-          v-model:selectedKeys="selectedAnalysis"
-          mode="horizontal"
-          theme="light"
-          @click="handleAnalysisChange"
-      >
-        <!-- 经济普查专题分析 -->
-        <a-sub-menu key="economic-census" :popup-match-selector="'.horizontal-menu-container'">
-          <template #title>
-            <span>专题分析</span>
-          </template>
-          <a-sub-menu key="industrial-enterpris`e" :popup-match-selector="'.horizontal-menu-container'">
-            <template #title>
-              <span>工业企业法人单位分析</span>
-            </template>
-            <a-menu-item key="industrial-enterprise-overall">工业企业法人单位总体分析</a-menu-item>
-            <a-menu-item key="industrial-enterprise-above-scale">规模以上工业企业法人单位总体分析</a-menu-item>
-            <a-menu-item key="industrial-enterprise-high-tech">规模以上高技术制造业分析总体分析</a-menu-item>
-          </a-sub-menu>
-          <a-menu-item key="construction-enterprise">建筑业企业法人单位分析</a-menu-item>
-          <a-menu-item key="wholesale-enterprise">批发业企业法人单位分析</a-menu-item>
-          <a-menu-item key="retail-enterprise">零售业企业法人单位分析</a-menu-item>
-          <a-menu-item key="accommodation-enterprise">住宿业企业法人单位分析</a-menu-item>
-          <a-menu-item key="catering-enterprise">餐饮业企业法人单位分析</a-menu-item>
-          <a-menu-item key="real-estate-enterprise">房地产企业法人单位总体分析</a-menu-item>
-          <a-menu-item key="financial-enterprise">金融业企业法人单位总体分析</a-menu-item>
-          <a-menu-item key="service-enterprise">服务业企业法人单位分析</a-menu-item>
-          <a-menu-item key="new-economy">新经济单位分析</a-menu-item>
-        </a-sub-menu>
-      </a-menu>
-    </div>
 
     <!-- 页面标题和操作栏 -->
     <div class="page-header">
       <div class="header-actions">
+        <a-menu
+            v-model:selectedKeys="selectedAnalysis"
+            mode="horizontal"
+            theme="light"
+            @click="handleAnalysisChange"
+        >
+          <!-- 经济普查专题分析 -->
+          <a-sub-menu key="economic-census" :popup-match-selector="'.horizontal-menu-container'">
+            <template #title>
+              <span>专题选择</span>
+            </template>
+            <a-sub-menu key="industrial-enterprise" :popup-match-selector="'.horizontal-menu-container'">
+              <template #title>
+                <span>工业企业法人单位分析</span>
+              </template>
+              <a-menu-item key="industrial-enterprise-overall">工业企业法人单位总体分析</a-menu-item>
+              <a-menu-item key="industrial-enterprise-above-scale">规模以上工业企业法人单位分析</a-menu-item>
+              <a-menu-item key="industrial-enterprise-high-tech">规模以上高技术制造业分析</a-menu-item>
+            </a-sub-menu>
+            <a-menu-item key="construction-enterprise">建筑业企业法人单位分析</a-menu-item>
+            <a-menu-item key="wholesale-enterprise">批发业企业法人单位分析</a-menu-item>
+            <a-menu-item key="retail-enterprise">零售业企业法人单位分析</a-menu-item>
+            <a-menu-item key="accommodation-enterprise">住宿业企业法人单位分析</a-menu-item>
+            <a-menu-item key="catering-enterprise">餐饮业企业法人单位分析</a-menu-item>
+            <a-menu-item key="real-estate-enterprise">房地产业企业法人单位分析</a-menu-item>
+            <a-menu-item key="financial-enterprise">金融业企业法人单位分析</a-menu-item>
+            <a-menu-item key="service-enterprise">服务业企业法人单位分析</a-menu-item>
+            <a-menu-item key="new-economy">新经济单位分析</a-menu-item>
+          </a-sub-menu>
+        </a-menu>
         <a-space :size="20">
           <span>版本号：</span>
           <a-select
@@ -105,10 +102,41 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue';
 import { message, List } from 'ant-design-vue';
 import { MenuFoldOutlined as MenuFold, MenuUnfoldOutlined as MenuUnfold } from '@ant-design/icons-vue';
+
+// TypeScript接口定义
+interface ChartDataItem {
+  name?: string;
+  value: number;
+  color?: string;
+  region?: string;
+  industry?: string;
+  year?: string;
+}
+
+interface AnalysisItem {
+  key: string;
+  title: string;
+  region: string;
+  date: string;
+  type: 'primary' | 'success' | 'warning' | 'info';
+  typeText: string;
+}
+
+interface RegionMap {
+  [key: string]: string;
+}
+
+interface AnalysisMap {
+  [key: string]: string;
+}
+
+interface LayoutMap {
+  [key: string]: any;
+}
 
 // 导入布局组件
 import Layout1 from '@/components/Thematic-Display/Layout1/index.vue';
@@ -127,28 +155,28 @@ import IndustryBarChart from '@/components/Thematic-Display/IndustryBarChart/ind
 import RegistrationPieChart from '@/components/Thematic-Display/RegistrationPieChart/index.vue';
 
 // 选中的版本号
-const selectedVersion = ref('v1');
+const selectedVersion = ref<string>('v1');
 
 // 选中的指标名
-const selectedIndicator = ref('total');
+const selectedIndicator = ref<string>('total');
 
 // 选中的区域
-const selectedRegion = ref('all');
+const selectedRegion = ref<string>('all');
 
 // 侧边栏折叠状态已移除，改用横板菜单
 
 // 选中的专题分析
-const selectedAnalysis = ref(['industrial-enterprise']);
+const selectedAnalysis = ref<string[]>(['industrial-enterprise']);
 
 // 当前活跃的分析项
-const activeAnalysisItem = ref('analysis-1');
+const activeAnalysisItem = ref<string>('analysis-1');
 
 // 是否显示分析列表
-const showAnalysisList = ref(true);
+const showAnalysisList = ref<boolean>(true);
 
 // 当前选中的分析类型
-const currentAnalysis = computed(() => {
-  const analysisMap = {
+const currentAnalysis = computed<string>(() => {
+  const analysisMap: AnalysisMap = {
     'industrial-enterprise': '工业企业法人单位分析',
     'industrial-enterprise-overall': '工业企业法人单位总体分析',
     'industrial-enterprise-above-scale': '规模以上工业企业法人单位总体分析',
@@ -167,8 +195,8 @@ const currentAnalysis = computed(() => {
 });
 
 // 根据分析类型选择布局
-const selectedLayout = computed(() => {
-  const layoutMap = {
+const selectedLayout = computed<any>(() => {
+  const layoutMap: LayoutMap = {
     'industrial-enterprise-overall': Layout1,    // 工业企业总体分析：地图+图表
     'industrial-enterprise-above-scale': Layout1, // 规模以上工业企业：地图+图表
     'industrial-enterprise-high-tech': Layout1,   // 高技术制造业：地图+图表
@@ -186,24 +214,24 @@ const selectedLayout = computed(() => {
 });
 
 // 布局2需要的数据
-const pieChartData1 = ref([
+const pieChartData1 = ref<ChartDataItem[]>([
   { name: '内资企业', value: 85600, color: '#1890ff' },
   { name: '港澳台商投资企业', value: 12400, color: '#ff85c0' },
   { name: '外商投资企业', value: 6800, color: '#ffd666' }
 ]);
-const pieChartData2 = ref([
+const pieChartData2 = ref<ChartDataItem[]>([
   { name: '国有企业', value: 12000, color: '#1890ff' },
   { name: '集体企业', value: 5000, color: '#ff85c0' },
   { name: '私营企业', value: 68600, color: '#ffd666' },
   { name: '股份合作企业', value: 4000, color: '#95de64' }
 ]);
-const pieChartData3 = ref([
+const pieChartData3 = ref<ChartDataItem[]>([
   { name: '大型企业', value: 15000, color: '#1890ff' },
   { name: '中型企业', value: 35000, color: '#ff85c0' },
   { name: '小型企业', value: 52000, color: '#ffd666' },
   { name: '微型企业', value: 88000, color: '#95de64' }
 ]);
-const pieChartData4 = ref([
+const pieChartData4 = ref<ChartDataItem[]>([
   { name: '制造业', value: 45000, color: '#1890ff' },
   { name: '批发和零售业', value: 35000, color: '#ff85c0' },
   { name: '服务业', value: 25000, color: '#ffd666' },
@@ -211,7 +239,7 @@ const pieChartData4 = ref([
 ]);
 
 // 布局3需要的数据
-const barChartData1 = ref([
+const barChartData1 = ref<ChartDataItem[]>([
   { region: '天河区', value: 12560, color: '#ff85c0' },
   { region: '越秀区', value: 9870, color: '#ff85c0' },
   { region: '荔湾区', value: 7560, color: '#ff85c0' },
@@ -219,7 +247,7 @@ const barChartData1 = ref([
   { region: '白云区', value: 11200, color: '#ff85c0' },
   { region: '黄埔区', value: 6890, color: '#ff85c0' }
 ]);
-const barChartData2 = ref([
+const barChartData2 = ref<ChartDataItem[]>([
   { industry: '批发和零售业', value: 15600, color: '#ffd666' },
   { industry: '制造业', value: 12300, color: '#ffd666' },
   { industry: '租赁和商务服务业', value: 9800, color: '#ffd666' },
@@ -227,7 +255,7 @@ const barChartData2 = ref([
   { industry: '信息传输、软件和信息技术服务业', value: 7600, color: '#ffd666' },
   { industry: '房地产业', value: 6500, color: '#ffd666' }
 ]);
-const barChartData3 = ref([
+const barChartData3 = ref<ChartDataItem[]>([
   { year: '2021', value: 85600, color: '#1890ff' },
   { year: '2022', value: 92400, color: '#1890ff' },
   { year: '2023', value: 104800, color: '#1890ff' },
@@ -236,12 +264,12 @@ const barChartData3 = ref([
 ]);
 
 // 布局4需要的数据
-const layout4PieData = ref([
+const layout4PieData = ref<ChartDataItem[]>([
   { name: '内资企业', value: 85600, color: '#1890ff' },
   { name: '港澳台商投资企业', value: 12400, color: '#ff85c0' },
   { name: '外商投资企业', value: 6800, color: '#ffd666' }
 ]);
-const layout4BarData1 = ref([
+const layout4BarData1 = ref<ChartDataItem[]>([
   { region: '天河区', value: 12560, color: '#ff85c0' },
   { region: '越秀区', value: 9870, color: '#ff85c0' },
   { region: '荔湾区', value: 7560, color: '#ff85c0' },
@@ -249,7 +277,7 @@ const layout4BarData1 = ref([
   { region: '白云区', value: 11200, color: '#ff85c0' },
   { region: '黄埔区', value: 6890, color: '#ff85c0' }
 ]);
-const layout4BarData2 = ref([
+const layout4BarData2 = ref<ChartDataItem[]>([
   { industry: '批发和零售业', value: 15600, color: '#ffd666' },
   { industry: '制造业', value: 12300, color: '#ffd666' },
   { industry: '租赁和商务服务业', value: 9800, color: '#ffd666' },
@@ -259,7 +287,7 @@ const layout4BarData2 = ref([
 ]);
 
 // 布局5需要的数据
-const barChartData4 = ref([
+const barChartData4 = ref<ChartDataItem[]>([
   { year: '2021', value: 25600, color: '#95de64' },
   { year: '2022', value: 32400, color: '#95de64' },
   { year: '2023', value: 44800, color: '#95de64' },
@@ -268,13 +296,13 @@ const barChartData4 = ref([
 ]);
 
 // 布局8需要的数据标题
-const pieChartTitle1 = ref('企业类型分布');
-const pieChartTitle2 = ref('企业规模分布');
-const pieChartTitle3 = ref('行业分布');
-const barChartTitle = ref('区域企业数量分布');
+const pieChartTitle1 = ref<string>('企业类型分布');
+const pieChartTitle2 = ref<string>('企业规模分布');
+const pieChartTitle3 = ref<string>('行业分布');
+const barChartTitle = ref<string>('区域企业数量分布');
 
 // 分析列表数据
-const analysisList = ref([
+const analysisList = ref<AnalysisItem[]>([
   {
     key: 'analysis-1',
     title: '规模以上工业企业法人单位总体分析',
@@ -310,7 +338,7 @@ const analysisList = ref([
 ]);
 
 // 地图数据
-const mapData = ref([
+const mapData = ref<ChartDataItem[]>([
   { name: '天河区', value: 12560 },
   { name: '越秀区', value: 9870 },
   { name: '荔湾区', value: 7560 },
@@ -325,7 +353,7 @@ const mapData = ref([
 ]);
 
 // 柱状图数据
-const barChartData = ref([
+const barChartData = ref<ChartDataItem[]>([
   { region: '天河区', value: 12560, color: '#ff85c0' },
   { region: '越秀区', value: 9870, color: '#ff85c0' },
   { region: '荔湾区', value: 7560, color: '#ff85c0' },
@@ -340,7 +368,7 @@ const barChartData = ref([
 ]);
 
 // 行业图表数据
-const industryChartData = ref([
+const industryChartData = ref<ChartDataItem[]>([
   { industry: '批发和零售业', value: 15600, color: '#ffd666' },
   { industry: '制造业', value: 12300, color: '#ffd666' },
   { industry: '租赁和商务服务业', value: 9800, color: '#ffd666' },
@@ -354,19 +382,19 @@ const industryChartData = ref([
 ]);
 
 // 环形图数据
-const pieChartData = ref([
+const pieChartData = ref<ChartDataItem[]>([
   { name: '内资企业', value: 85600, color: '#1890ff' },
   { name: '港澳台商投资企业', value: 12400, color: '#ff85c0' },
   { name: '外商投资企业', value: 6800, color: '#ffd666' }
 ]);
 
 // 获取当前分析标题
-const getCurrentAnalysisTitle = () => {
+const getCurrentAnalysisTitle = (): string => {
   return currentAnalysis.value;
 };
 
 // 处理专题分析切换
-const handleAnalysisChange = ({ key }) => {
+const handleAnalysisChange = ({ key }: { key: string }) => {
   selectedAnalysis.value = [key];
   message.success(`已切换到：${getCurrentAnalysisTitle()}`);
 
@@ -375,7 +403,7 @@ const handleAnalysisChange = ({ key }) => {
 };
 
 // 处理分析列表项点击
-const handleAnalysisItemClick = (item) => {
+const handleAnalysisItemClick = (item: AnalysisItem) => {
   activeAnalysisItem.value = item.key;
   message.info(`查看分析报告：${item.title}`);
   // 这里可以加载具体的分析报告数据
@@ -384,7 +412,7 @@ const handleAnalysisItemClick = (item) => {
 // 切换侧边栏折叠状态函数已移除，改用横板菜单
 
 // 加载分析数据
-const loadAnalysisData = async (analysisKey) => {
+const loadAnalysisData = async (analysisKey: string): Promise<void> => {
   try {
     console.log(`加载分析数据：${analysisKey}`);
     // 模拟API调用
@@ -398,12 +426,12 @@ const loadAnalysisData = async (analysisKey) => {
 
 
 // 处理区域点击
-const handleRegionClick = (region) => {
+const handleRegionClick = (region: string) => {
   selectedRegion.value = region;
 };
 
 // 加载区域数据
-const loadRegionData = async (region) => {
+const loadRegionData = async (region: string): Promise<void> => {
   try {
     console.log(`加载 ${region} 区域数据`);
     message.success(`已切换到${getRegionName(region)}数据`);
@@ -414,8 +442,8 @@ const loadRegionData = async (region) => {
 };
 
 // 获取区域名称
-const getRegionName = (regionCode) => {
-  const regionMap = {
+const getRegionName = (regionCode: string): string => {
+  const regionMap: RegionMap = {
     'all': '广州市全域',
     'tianhe': '天河区',
     'yuexiu': '越秀区',
@@ -433,26 +461,26 @@ const getRegionName = (regionCode) => {
 };
 
 // 监听版本号变化
-watch(selectedVersion, (newVersion) => {
+watch(selectedVersion, (newVersion: string) => {
   console.log(`切换到版本 ${newVersion}`);
   message.success(`已切换到版本 ${newVersion}`);
 });
 
 // 监听指标名变化
-watch(selectedIndicator, (newIndicator) => {
+watch(selectedIndicator, (newIndicator: string) => {
   console.log(`切换到指标 ${newIndicator}`);
   message.success(`已切换到指标 ${newIndicator}`);
 });
 
 // 监听区域选择变化
-watch(selectedRegion, (newRegion) => {
+watch(selectedRegion, (newRegion: string) => {
   loadRegionData(newRegion);
 });
 
 // 组件挂载时加载数据
-onMounted(() => {
-  loadRegionData('all');
-  loadAnalysisData(selectedAnalysis.value[0]);
+onMounted(async () => {
+  await loadRegionData('all');
+  await loadAnalysisData(selectedAnalysis.value[0]);
 });
 </script>
 

@@ -365,8 +365,8 @@ export default {
           'esri/layers/TileLayer',
           'esri/widgets/Popup'
         ], {
-          url: 'http://192.168.94.114/4.19/init.js',
-          css: 'http://192.168.94.114/4.19/esri/themes/light/main.css'
+          url: 'http://10.44.58.28:8000/4.19/init.js',
+          css: 'http://10.44.58.28:8000/4.19/esri/themes/light/main.css'
         });
 
         mapModules.value = modules;

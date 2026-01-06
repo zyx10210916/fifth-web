@@ -46,9 +46,6 @@ const colorPalette = [
     ['#b6a2de', '#675bba'], ['#ff9db5', '#e03e52']
 ];
 
-/**
- * 核心逻辑
- */
 const prepareChartData = (rawData: any, dataKey: string, isHorizontal: boolean) => {
     const regions = Object.keys(rawData);
     const categorySet = new Set<string>();
@@ -87,9 +84,6 @@ const prepareChartData = (rawData: any, dataKey: string, isHorizontal: boolean) 
     return { categories, series, totalSum };
 };
 
-/**
- * 通用配置
- */
 const getOption = (categories: string[], seriesData: any[], isHorizontal: boolean): EChartsOption => ({
     grid: {
         top: '20%',
@@ -142,12 +136,10 @@ const processData = () => {
     if (!data || Object.keys(data).length === 0) return;
 
     nextTick(() => {
-        // 资产情况 
         const assetObj = prepareChartData(data, 'totalAssets', false);
         totalAssetsSum.value = assetObj.totalSum;
         assetChart?.setOption(getOption(assetObj.categories, assetObj.series, false), true);
 
-        // 营业利润 
         const profitObj = prepareChartData(data, 'operatingProfit', true);
         totalProfitSum.value = profitObj.totalSum;
         profitChart?.setOption(getOption(profitObj.categories, profitObj.series, true), true);

@@ -43,15 +43,17 @@ import FilterModal from './filter.vue';
 import SummaryDisplay from './summary-display/index.vue';
 import UnitHeatmap from './unit-heatmap/index.vue';
 import DataComparison from './data-comparison/index.vue';
+import BuildingDisplay from './building-display/index.vue';
 
 const activeTabKey = ref('summary');
 const filterVisible = ref(false);
-const filterParams = ref({}); // 初始值为空对象
+const filterParams = ref({}); 
 
 const componentMap = {
   summary: SummaryDisplay,
   heatmap: UnitHeatmap,
   comparison: DataComparison,
+  building: BuildingDisplay,
 };
 
 const activeComponent = computed(() => componentMap[activeTabKey.value]);

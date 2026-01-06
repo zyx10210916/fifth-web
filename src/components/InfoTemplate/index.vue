@@ -270,7 +270,7 @@ import QueryTemplateModal from './QueryTemplateModal/index.vue';
 
 import axios from 'axios';
 import { message } from 'ant-design-vue';
-import { buniscGetData, indexGetData, findDataQueryPage, professionalList, areaList, dynamicExportExcel, getDataConditionQueryTemplateList, saveDataConditionQueryTemplate } from '@/api/data-processing';
+import { buniscGetData, indexGetData, findDataQueryPage, professionalList, areaList, dynamicExportExcel, dynamicExportCsv, getDataConditionQueryTemplateList, saveDataConditionQueryTemplate } from '@/api/data-processing';
 import { getToken, isLogin } from '@/utils/auth';
 import router from "../../router";
 import { h } from 'vue';
@@ -431,9 +431,12 @@ const sortClickCount = ref({});
 
 // 保存模板处理函数
 const handleSaveTemplate = () => {
-  // 从getDataData中提取当前查询参数，排除columnQueries字段
-  const { columnsAndTable, pageNo, pageSize, sortOrder, sortField, area, city, ...queryParams } = getDataData;
-  currentQueryConditions.value = queryParams;
+  // 保存整个searchForm和getDataData，但排除不需要的字段
+  const { columnsAndTable, pageNo, pageSize, sortOrder, sortField, area, city, ...getDataDataWithoutExcluded } = getDataData;
+  currentQueryConditions.value = {
+    ...searchForm,
+    ...getDataDataWithoutExcluded
+  };
   queryTemplateModalVisible.value = true;
 };
 
@@ -653,14 +656,7 @@ const handleTagConfirm = (queryCriteria: any) => {
   console.log('最终处理后的查询条件数据:', queryData);
 
   // 将标签的查询条件覆盖到searchForm中
-  // 清空searchForm
-  Object.keys(searchForm).forEach(key => {
-    if (key !== 'currentReport') { // 保留currentReport字段
-      searchForm[key] = '';
-    }
-  });
-
-  // 应用处理后的查询条件
+  // 只覆盖指标查询、运算符和值三个项，不清空其他字段
   if (queryData) {
     // 基础字段赋值 - 始终保留第一个条件作为基础查询
     searchForm.indexQuery = queryData.indexQuery;
@@ -904,9 +900,8 @@ const performExport = (allImport: number, format: string = 'xlsx') => {
       console.error('导出失败:', error);
     });
   } else if (format === 'csv') {
-    // 这里可以添加CSV格式导出的API调用
-    // 目前暂时使用相同的API，实际项目中可能需要不同的API
-    dynamicExportExcel(exportData)
+    // 使用CSV导出API
+    dynamicExportCsv(exportData)
         .then(data => {
           loading.value = false;
 
@@ -1308,6 +1303,17 @@ const handleQueryTemplateChange = (value: string, option: any) => {
 
     if (parsedConditions.derivativeColumn) {
       getDataData.derivativeColumn = parsedConditions.derivativeColumn;
+    }
+
+    // 应用模板中的指标查询、运算符和值
+    if (parsedConditions.indexQuery) {
+      searchForm.indexQuery = parsedConditions.indexQuery;
+    }
+    if (parsedConditions.queryValue) {
+      searchForm.queryValue = parsedConditions.queryValue;
+    }
+    if (parsedConditions.operator) {
+      searchForm.operator = parsedConditions.operator;
     }
 
     // 执行查询

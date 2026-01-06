@@ -25,7 +25,7 @@ const isFirstLoad = ref(true);
 const fetchData = async (extraParams = {}) => {
   try {
     const defaultCompare = {
-      area: "440103,440104", // 越秀、荔湾
+      area: "440103,440104", 
       industryDept: "",
       registerType: "",
       unitScale: "",

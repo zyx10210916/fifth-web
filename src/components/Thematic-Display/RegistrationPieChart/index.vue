@@ -48,7 +48,7 @@ const initChart = () => {
     },
     legend: {
       orient: 'vertical',
-      right: 0,
+      left: '60%',
       top: 'center',
       width: '50%',
       formatter: function (name) {
@@ -63,7 +63,7 @@ const initChart = () => {
       {
         name: '注册类型构成',
         type: 'pie',
-        radius: ['40%', '70%'],
+        radius: ['40%', '65%'],
         center: ['30%', '50%'],
         avoidLabelOverlap: false,
         itemStyle: {

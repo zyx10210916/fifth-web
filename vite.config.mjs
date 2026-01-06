@@ -24,7 +24,7 @@ export default ({ command, mode }) => {
             port: 3000,
             open: false,
             cors: false,
-            host: '0.0.0.0',
+            host: '127.0.0.1',
             proxy,
         },
 

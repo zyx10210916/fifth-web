@@ -48,6 +48,15 @@ declare module 'vue' {
     DownOutlined: typeof import('@ant-design/icons-vue')['DownOutlined']
     EditOutlined: typeof import('@ant-design/icons-vue')['EditOutlined']
     EditTemplateModal: typeof import('./../src/components/Summary/EditTemplateModal/index.vue')['default']
+    ElButton: typeof import('element-plus/es')['ElButton']
+    ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
+    ElCheckboxGroup: typeof import('element-plus/es')['ElCheckboxGroup']
+    ElDivider: typeof import('element-plus/es')['ElDivider']
+    ElInput: typeof import('element-plus/es')['ElInput']
+    ElPagination: typeof import('element-plus/es')['ElPagination']
+    ElPopover: typeof import('element-plus/es')['ElPopover']
+    ElTable: typeof import('element-plus/es')['ElTable']
+    ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
     EquationEditor: typeof import('./../src/components/DerivativeIndicators/EquationEditor/index.vue')['default']
     ExportModal: typeof import('./../src/components/InfoTemplate/ExportModal/index.vue')['default']
     FilterCriteria: typeof import('./../src/components/InfoTemplate/FilterCriteria/index.vue')['default']
@@ -86,5 +95,8 @@ declare module 'vue' {
     TagQueryModal: typeof import('./../src/components/InfoTemplate/TagQueryModal.vue')['default']
     TemplateManage: typeof import('./../src/components/TemplateManage/index.vue')['default']
     UserOutlined: typeof import('@ant-design/icons-vue')['UserOutlined']
+  }
+  export interface ComponentCustomProperties {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }

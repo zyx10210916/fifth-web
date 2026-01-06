@@ -54,6 +54,10 @@ const handleSearch = () => {
 watch(templateName, () => {
   handleSearch();
 });
+
+watch(selectedYear, () => {
+  handleSearch();
+});
 </script>
 
 <style lang="scss" scoped>

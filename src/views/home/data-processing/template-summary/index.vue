@@ -390,7 +390,7 @@ const formatTimestamp = (timestamp) => {
 const loadData = async () => {
   loading.value = true;
   try {
-    // 构建查询参数，使用Q_TEMPLATE-NAME_S_LK作为模板名称的查询字段
+    // 构建查询参数，仅包含模板名称
     const apiParams = {
       pageNo: pagination.value.current,
       pageSize: pagination.value.pageSize,
@@ -406,8 +406,15 @@ const loadData = async () => {
 
     if (response && response.data) {
       console.log("data", response.data)
-      tableData.value = response.data || [];
-      pagination.value.total = response.data.total || 0;
+      // 在前端进行年份过滤
+      const filteredData = response.data.filter(item => {
+        if (!item.CREATE_TIME_) return true;
+        // 将时间戳转换为年份进行比较
+        const itemYear = new Date(item.CREATE_TIME_).getFullYear();
+        return itemYear === searchParams.value.year;
+      });
+      tableData.value = filteredData || [];
+      pagination.value.total = filteredData.length || 0;
     }
   } catch (error) {
     console.error('加载汇总模板列表失败:', error);

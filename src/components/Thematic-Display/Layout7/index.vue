@@ -148,7 +148,7 @@ const props = defineProps({
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  border: 1px solid #f0f0f0;
+  //border: 1px solid #f0f0f0;
   flex: 1; /* 四个容器均分宽度 */
 
   .chart-header {
@@ -157,10 +157,10 @@ const props = defineProps({
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #f0f0f0;
+    //border-bottom: 1px solid #f0f0f0;
 
     .chart-title {
-      font-size: 16px;
+      font-size: 20px;
       font-weight: 500;
       color: #262626;
       margin: 0;

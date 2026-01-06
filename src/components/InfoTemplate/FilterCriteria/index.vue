@@ -957,7 +957,7 @@ defineExpose({
           <div class="flex-row items-center pos_2" @click="handleBackClick">
             <img class="shrink-0 image" src="/src/assets/images/5f98434fc06fa50e59f5a548bf6d250d.png" />
             <span class="font_2 text_3" style="cursor: pointer">返回</span>
-            <span class="font text">设置汇总口径</span>
+            <span class="font text">编辑过滤条件</span>
           </div>
 
         </div>
@@ -1329,7 +1329,7 @@ defineExpose({
             <div class="draggable-input-container">
             <textarea
                 class="draggable-input"
-                placeholder="请输入汇总单独处理公式"
+                placeholder="请输入过滤条件公式"
                 v-model="formulaText"
                 ref="draggableInputRef"
             ></textarea>

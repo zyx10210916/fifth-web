@@ -70,8 +70,6 @@
 import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapTools from './MapTools.vue';
-
-// 导入底图资源
 import dtNormal from "@/assets/images/dt-1.png";
 import dtActive from "@/assets/images/dt-2.png";
 import yxtNormal from "@/assets/images/yxt-1.png";
@@ -80,18 +78,7 @@ import yxtActive from "@/assets/images/yxt-2.png";
 export default {
   name: 'ArcGISFeatureLayerJsonMix',
   components: { MapTools },
-  props: {
-    // 是否去掉外边距（全屏模式）
-    isFullSize: {
-      type: Boolean,
-      default: false
-    },
-    // 是否开启点击图层点显示弹窗
-    showPopup: {
-      type: Boolean,
-      default: false
-    }
-  },
+  props: {isFullSize: { type: Boolean, default: false },showPopup: {type: Boolean, default: false }},
   setup(props, { emit }) {
     const view = shallowRef(null);
     const panelVisible = ref(true);
@@ -126,14 +113,11 @@ export default {
     const economicLayers = computed(() => layers.value.filter(l => l.type === "economic"));
     const boundaryLayers = computed(() => layers.value.filter(l => l.type === "boundary"));
 
-    // 计算多边形中心点
     const calculatePolygonCenter = (rings) => {
       let x = 0, y = 0, count = 0;
-      // rings[0] 通常是外环
       const points = Array.isArray(rings[0][0]) ? rings[0] : rings[0];
 
       points.forEach(coord => {
-        // 适配 [x, y] 或 {x, y}
         x += (coord[0] || coord.x);
         y += (coord[1] || coord.y);
         count++;
@@ -142,7 +126,6 @@ export default {
       return [x / count, y / count];
     };
 
-    // 创建文本标注层 
     const createLabelLayer = async (layerId, features, modules) => {
       try {
         const [FeatureLayer, TextSymbol, LabelClass, Point] = [
@@ -159,16 +142,15 @@ export default {
         if (!labelField) return null;
 
         const graphics = [];
-        const uniqueNames = new Set(); // 用于存储已经处理过的名称
+        const uniqueNames = new Set(); 
 
         features.forEach((f, index) => {
-          // 兼容处理：ArcGIS查询出来的要素属性在 attributes 里，GeoJSON 在 properties 里 
           const attr = f.attributes || f.properties;
           if (!attr) return;
 
           const textValue = attr[labelField];
-          if (textValue && !uniqueNames.has(textValue)) { // 检查是否已存在该名称
-            uniqueNames.add(textValue); // 添加到已处理集合 
+          if (textValue && !uniqueNames.has(textValue)) { 
+            uniqueNames.add(textValue); 
 
             let centerPoint = null;
 
@@ -176,7 +158,6 @@ export default {
               if (f.geometry.type === "point") {
                 centerPoint = f.geometry;
               } else {
-                // 如果是多边形，使用内置的 centroid (质心) 或 extent.center 
                 centerPoint = f.geometry.centroid || f.geometry.extent.center;
               }
             }
@@ -219,7 +200,7 @@ export default {
           }],
           renderer: {
             type: "simple",
-            symbol: { type: "simple-marker", size: 0 } // 隐藏点
+            symbol: { type: "simple-marker", size: 0 } 
           },
           spatialReference: { wkid: 4526 },
           visible: labelVisibility.value[layerId]
@@ -233,7 +214,6 @@ export default {
       }
     };
 
-    // JSON转FeatureLayer函数 
     const createJsonLayer = async (config) => {
       try {
         loadingText.value = `正在加载${config.title}...`;
@@ -253,7 +233,6 @@ export default {
           return new mapModules.value[3]({ geometry, attributes: { ...f.properties, ObjectId: index, ObjectID: index } });
         });
 
-        // 核心修改：根据 prop 决定是否开启弹窗
         let popupTemplate = null;
         if (props.showPopup && config.id === "building") {
           popupTemplate = {
@@ -272,9 +251,9 @@ export default {
         }
 
         const layerColors = {
-          city: [144, 238, 144, 0.1],
-          district: [173, 216, 230, 0.3],
-          town: [255, 218, 185, 0.2],
+          city: [144, 238, 144, 0.1],  
+          district: [173, 216, 230, 0.3], 
+          town: [255, 218, 185, 0.2],     
           village: [221, 160, 221, 0.2]
         };
 
@@ -293,40 +272,19 @@ export default {
             { name: "ObjectId", type: "oid" },
             ...Object.keys(data.features[0].properties).map(key => ({ name: key, type: "string" }))
           ],
-          popupTemplate: popupTemplate, // 应用弹窗配置
+          popupTemplate: popupTemplate, 
           renderer: config.type === "economic"
             ? (data.features[0].geometry.type === "Point"
-              ? {
-                type: "simple",
-                symbol: {
-                  type: "simple-marker",
-                  color: [255, 215, 0, 0.9],  // 金色 (Gold)
-                  size: "8px",
-                  outline: {
-                    color: [255, 140, 0, 0.8],  // 深橙色边框 
-                    width: "1px"
-                  }
-                }
-              }
-              : {
-                type: "simple",
-                symbol: {
-                  type: "simple-fill",
-                  color: [255, 215, 0, 0.2],  // 半透明金色填充 
-                  outline: {
-                    color: [255, 140, 0, 0.6], // 半透明深橙色边框 
-                    width: "1.5px"
-                  }
-                }
-              })
+              ? { type: "simple", symbol: { type: "simple-marker", color: [255, 165, 0, 0.8], size: 8 } }
+              : { type: "simple", symbol: { type: "simple-fill", color: [51, 136, 255, 0.1], outline: { color: [51, 136, 255, 0.8], width: 1.5 } } })
             : {
               type: "simple",
               symbol: {
                 type: "simple-fill",
-                color: [211, 211, 211, 0.1], // 默认淡灰色填充 
+                color: layerColors[config.id] || [51, 136, 255, 0.1],
                 outline: {
-                  color: [169, 169, 169, 0.6], // 默认中灰色边框 
-                  width: "1px"
+                  color: outlineColors[config.id] || [51, 136, 255, 0.8],
+                  width: 1.5
                 }
               }
             },
@@ -339,10 +297,8 @@ export default {
       } catch (e) { return null; }
     };
 
-    // 异步加载图层 
     const loadLayersSequentially = async (map) => {
       try {
-        // 保持原有加载顺序不变 
         const defaultVisibleConfigs = layerConfigs.filter(c => c.defaultVisible);
         const defaultLayers = await Promise.all(defaultVisibleConfigs.map(config => createJsonLayer(config)));
 
@@ -352,38 +308,33 @@ export default {
 
         loading.value = false;
 
-        // 加载非默认显示的图层 
         const otherConfigs = layerConfigs.filter(c => !c.defaultVisible);
+
         const otherLayers = await Promise.all(otherConfigs.map(async (config) => {
           const layer = await createJsonLayer(config);
+
           if (config.id === 'village' && layer) {
+            console.log("检测到村社区图层，开始异步创建标注...");
             createLabelsAsync(layer, map);
           }
           return layer;
         }));
 
-        // 强制建筑点图层到最上层 
-        const buildingLayer = map.findLayerById('building');
-        if (buildingLayer) {
-          map.reorder(buildingLayer, map.layers.length - 1);
-        }
+        console.log("所有非预置图层数据已加载就绪");
 
-        console.log("所有图层数据已加载就绪");
       } catch (error) {
         console.error("图层加载失败:", error);
         loading.value = false;
       }
     };
-    // 异步创建标注图层的函数
+
     const createLabelsAsync = async (villageLayer, map) => {
       try {
-        // queryFeatures() 返回的是一个 FeatureSet 对象
         const featureSet = await villageLayer.queryFeatures();
-        const features = featureSet.features; // 获取要素数组
+        const features = featureSet.features;
 
         if (!features || features.length === 0) return;
 
-        // 分别创建三个标注层
         const dLayer = await createLabelLayer('district', features, mapModules.value);
         if (dLayer) map.add(dLayer);
 
@@ -399,7 +350,6 @@ export default {
       }
     };
 
-    // 更新标注可见性 
     const updateLabelVisibility = () => {
       if (!view.value || !labelLayers.value) return;
 
@@ -413,7 +363,6 @@ export default {
 
     const handleMapSelection = (uniqueCodeStr) => {
       console.log('地图中转层接收到代码:', uniqueCodeStr);
-      // 将事件继续向上抛给 summary-diaplay/index.vue
       emit('map-select', uniqueCodeStr);
     };
 
@@ -425,8 +374,8 @@ export default {
           'esri/layers/TileLayer', 'esri/symbols/TextSymbol', 'esri/layers/support/LabelClass',
           'esri/geometry/Point'
         ], {
-          url: 'http://192.168.94.114/4.19/init.js',
-          css: 'http://192.168.94.114/4.19/esri/themes/light/main.css'
+          url: 'http://10.44.58.28:8000/4.19/init.js',
+          css: 'http://10.44.58.28:8000/4.19/esri/themes/light/main.css'
         });
 
         mapModules.value = modules;
@@ -439,22 +388,21 @@ export default {
 
         const map = new Map({
           basemap: defaultBasemap,
-          layers: [] // 初始为空，逐步添加图层 
+          layers: [] 
         });
 
-        // 确保 SpatialReference 被实例化了
         const sr = new SpatialReference({ wkid: 4526 });
 
         view.value = new MapView({
           container: "viewDiv",
           map: map,
-          spatialReference: sr, // 使用实例化的对象
+          spatialReference: sr, 
           extent: {
             xmin: 38392997.07,
             ymin: 2495903.35,
             xmax: 38505644.28,
             ymax: 2648163.20,
-            spatialReference: sr // 这里也要带上
+            spatialReference: sr 
           },
           ui: { components: [] }
         });
@@ -462,12 +410,10 @@ export default {
 
         mapInitialized.value = true;
 
-        // 核心修改：根据 Prop 决定是否启用视图弹窗
         view.value.when(() => {
           view.value.popup.autoOpenEnabled = props.showPopup;
         });
 
-        // 初始化完成后开始逐步加载图层 
         loadLayersSequentially(map);
       } catch (error) {
         console.error("Map Initialization Failed:", error);
@@ -482,30 +428,32 @@ export default {
 
         const targetLayer = view.value?.map.findLayerById(layer.id);
 
-        if (!targetLayer) {
+        if (!targetLayer) { 
           const config = layerConfigs.find(c => c.id === layer.id);
           if (!config) return;
 
-          const layerInstance = await createJsonLayer(config);
-          if (layerInstance) {
-            view.value.map.add(layerInstance);
+          const layerData = layers.value.find(l => l.id === layer.id);
 
-            // 如果是建筑点，确保在最上层
-            if (layer.id === 'building') {
-              view.value.map.reorder(layerInstance, view.value.map.layers.length - 1);
-            }
+          if (layerData) {
+            const rawInstance = toRaw(layerData.instance);
+            view.value.map.add(rawInstance);
+            rawInstance.visible = layer.visible; 
 
             if (config.id === 'village') {
-              await createLabelsAsync(layerInstance, view.value.map);
+              await createLabelsAsync(rawInstance, view.value.map);
+            }
+          } else {
+            const newLayer = await createJsonLayer(config);
+            if (newLayer) {
+              view.value.map.add(newLayer);
+              newLayer.visible = layer.visible; 
+              if (config.id === 'village') {
+                await createLabelsAsync(newLayer, view.value.map);
+              }
             }
           }
         } else {
           targetLayer.visible = layer.visible;
-
-          // 如果建筑点变为可见，确保在最上层 
-          if (layer.id === 'building' && layer.visible) {
-            view.value.map.reorder(targetLayer, view.value.map.layers.length - 1);
-          }
         }
       } catch (error) {
         console.error(`更新图层 ${layer.id} 可见性失败:`, error);
@@ -538,10 +486,8 @@ export default {
     return {
       view, panelVisible, economicLayers, boundaryLayers, mapList,
       activeBasemapId, basemapVisible, loading, loadingText, labelVisibility,
-      handleBasemapChange,
-      handleMapSelection,
-      updateLayerVisibility, updateBasemapVisibility, updateLabelVisibility, togglePanel,
-      handleSelectionComplete: handleMapSelection
+      handleBasemapChange,handleMapSelection,handleSelectionComplete: handleMapSelection,
+      updateLayerVisibility, updateBasemapVisibility, updateLabelVisibility, togglePanel
     };
   }
 };
@@ -552,12 +498,10 @@ export default {
   flex: 1;
   background: white;
   margin: 0 15px;
-  /* 默认边距 */
   height: 100%;
   border-radius: 6px;
   overflow: hidden;
 
-  /* 当 full-size 类存在时去掉边距 */
   &.full-size {
     margin: 0 !important;
   }
@@ -643,7 +587,6 @@ export default {
   cursor: pointer;
 }
 
-/* 加载 */
 .loading-overlay {
   position: absolute;
   inset: 0;

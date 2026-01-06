@@ -41,7 +41,6 @@ let profitChart: echarts.ECharts | null = null;
 const totalAssetsSum = ref(0);
 const totalProfitSum = ref(0);
 
-// 通用柱状图配置生成函数
 const getBarOption = (data: any[]): EChartsOption => ({
   grid: {
     top: '15%',
@@ -69,7 +68,7 @@ const getBarOption = (data: any[]): EChartsOption => ({
       fontSize: 14, 
       color: '#666',
       interval: 0,
-      rotate: 45, // 行业名称长，倾斜显示
+      rotate: 50, 
       formatter: (val: string) => val.length > 20 ? val.slice(0, 20) + '...' : val
     }
   },
@@ -83,10 +82,9 @@ const getBarOption = (data: any[]): EChartsOption => ({
     barWidth: '40%',
     data: data.map(item => item.value),
     itemStyle: {
-      // 这里的 offset 0 和 1 实现了从浅色到原本 Exam 颜色的渐变
       color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: '#ffb570' }, // 浅橘色（Exam 色系的浅色版）
-        { offset: 1, color: '#ff8800' }  // 橘色
+        { offset: 0, color: '#ffb570' },
+        { offset: 1, color: '#ff8800' } 
       ]),
       borderRadius: [4, 4, 0, 0]
     }
@@ -98,7 +96,7 @@ const processData = () => {
   if (!res || Object.keys(res).length === 0) return;
 
   nextTick(()=>{
-  // 1. 处理资产情况
+  // 处理资产情况
   if (res.totalAssets && Array.isArray(res.totalAssets)) {
     const assetsData = res.totalAssets.map((item: any) => ({
       name: item.name,
@@ -108,7 +106,7 @@ const processData = () => {
     assetChart?.setOption(getBarOption(assetsData));
   }
 
-  // 2. 处理营业利润
+  //处理营业利润
   if (res.operatingProfit && Array.isArray(res.operatingProfit)) {
     const profitData = res.operatingProfit.map((item: any) => ({
       name: item.name,
@@ -168,7 +166,6 @@ watch(() => props.summaryData, processData, { deep: true });
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  /* box-shadow: 0 2px 10px rgba(0,0,0,0.05); */
 }
 
 .head {

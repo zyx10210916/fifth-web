@@ -7,7 +7,6 @@
         <div class="right"></div>
       </div>
       <div class="content">
-         <!-- 复现原本的SVG结构 -->
         <svg 
           data-v-9dada9bc 
           data-v-e868fad4 
@@ -99,7 +98,6 @@
 import * as echarts from 'echarts';
 import { ref, watch, onMounted } from 'vue';
 
-// 接收父组件传来的数据
 const props = defineProps({
   summaryData: { type: Object, default: () => ({}) }
 });
@@ -109,12 +107,10 @@ const revenueChartRef = ref<HTMLElement | null>(null);
 let chart1: echarts.ECharts | null = null;
 let chart2: echarts.ECharts | null = null;
 
-// UI 绑定变量
 const totalCorporateCount = ref(0);
 const totalPersonnel = ref(0);
 const totalEconomic = ref(0);
 
-// 颜色映射表
 const colorMap: any = {
   "大型": "#57defd",
   "中型": "#b3e34b",
@@ -123,7 +119,6 @@ const colorMap: any = {
   "未知": "#8088ff"
 };
 
-// ECharts 基础配置
 const getCommonOption = () => ({
   legend: {
     orient: 'vertical',
@@ -157,7 +152,6 @@ const getCommonOption = () => ({
   }]
 });
 
-// 核心数据处理逻辑
 const processData = () => {
   const res = props.summaryData;
   if (!res || Object.keys(res).length === 0) return;
@@ -169,10 +163,9 @@ const processData = () => {
   if (res.employmentPersonnel && Array.isArray(res.employmentPersonnel)) {
     const pData = res.employmentPersonnel.map((item: any) => ({
       name: item.name,
-      value: (Number(item.value) / 10000).toFixed(2), // 换算成“万”展示
+      value: (Number(item.value) / 10000).toFixed(2), 
       itemStyle: { color: colorMap[item.name] || '#ccc' }
     }));
-    // 计算总人数用于头部显示
     totalPersonnel.value = res.employmentPersonnel.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
     chart1?.setOption({ series: [{ data: pData }] });
   }
@@ -181,10 +174,9 @@ const processData = () => {
   if (res.operatingIncome && Array.isArray(res.operatingIncome)) {
     const eData = res.operatingIncome.map((item: any) => ({
       name: item.name,
-      value: (Number(item.value) / 10000).toFixed(2), // 换算成“万”展示
+      value: (Number(item.value) / 10000).toFixed(2), 
       itemStyle: { color: colorMap[item.name] || '#ccc' }
     }));
-    // 计算总收入用于头部显示
     totalEconomic.value = res.operatingIncome.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
     chart2?.setOption({ series: [{ data: eData }] });
   }
@@ -212,7 +204,6 @@ watch(() => props.summaryData, () => {
 </script>
 
 <style scoped>
-/* 左侧面板主容器样式 */
 .left {
 width: 480px;
 height: 100%;
@@ -226,7 +217,6 @@ gap: 10px;
 flex-shrink: 0;
 }
 
-/* 卡片容器通用样式 */
 .item-box {
 background-color: white;
 border-radius: 4px;
@@ -235,7 +225,6 @@ display: flex;
 flex-direction: column;
 }
 
-/* 卡片头部通用样式 */
 .head {
   display: flex;
   justify-content: space-between; 
@@ -255,20 +244,17 @@ flex-direction: column;
   margin-left: 10px;      
 }
 
-/* 内容区通用样式 */
 .content {
 flex: 1;
 position: relative;
 padding: 0px 10px 10px 10px;
 }
 
-/* 法人单位数量特定样式 */
 .corporate-box .content {
 padding: 0;
 height: 100px;
 }
 
-/* 数字显示文本样式 */
 .item-1-text {
 position: absolute;
 left: 20px;
@@ -280,7 +266,6 @@ text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 z-index: 2;
 }
 
-/* 从业人员和营业收入特定样式 */
 .personnel-box,
 .revenue-box {
 flex: 1 1 0%;
@@ -292,7 +277,6 @@ padding: 0;
 height: 100%;
 }
 
-/* 图表容器样式 */
 .chart-container {
 width: 100%;
 height: 100%;

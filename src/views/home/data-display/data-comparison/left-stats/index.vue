@@ -63,9 +63,6 @@ const colorPalette = [
   ['#b6a2de', '#675bba']  
 ];
 
-/**
- * 通用数据处理
- */
 const prepareChartData = (rawData: any, dataKey: string, isHorizontal: boolean) => {
   const regions = Object.keys(rawData);
   const categorySet = new Set<string>();
@@ -103,9 +100,6 @@ const prepareChartData = (rawData: any, dataKey: string, isHorizontal: boolean) 
   return { categories, series, totalSum };
 };
 
-/**
- * 通用配置
- */
 const getOption = (categories: string[], seriesData: any[], isHorizontal: boolean): EChartsOption => {
   const commonAxisLabel = { fontSize: 14, color: '#666' };
   
@@ -149,17 +143,14 @@ const processData = () => {
   if (!data || Object.keys(data).length === 0) return;
 
   nextTick(() => {
-    // 法人单位
     const corp = prepareChartData(data, 'legalPersonNumList', false);
     totalCorporateCount.value = Object.values(data).reduce((acc: any, cur: any) => acc + (cur.legalPersonNum || 0), 0);
     chart1?.setOption(getOption(corp.categories, corp.series, false), true);
 
-    // 从业人员
     const pers = prepareChartData(data, 'employmentPersonnel', true);
     totalPersonnel.value = pers.totalSum;
     chart2?.setOption(getOption(pers.categories, pers.series, true), true);
 
-    // 营业收入 
     const rev = prepareChartData(data, 'operatingIncome', false);
     totalEconomic.value = rev.totalSum;
     chart3?.setOption(getOption(rev.categories, rev.series, false), true);
