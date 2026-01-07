@@ -127,18 +127,18 @@ const getCommonOption = () => ({
     itemWidth: 12,
     itemHeight: 12,
     itemGap: 25,
-    textStyle: { color: '#666', fontSize: 18 }
+    textStyle: { color: '#666', fontSize: 16 }
   },
   tooltip: {
     trigger: 'item',
     backgroundColor: 'rgba(50, 50, 50, 0.8)',
     borderWidth: 0,
-    textStyle: { color: 'white' ,fontSize: 18},
+    textStyle: { color: 'white' ,fontSize: 16},
     formatter: (p: any) => `<span style="display:inline-block;margin-right:5px;border-radius:50%;width:10px;height:10px;background-color:${p.color};"></span>${p.name}: ${p.value}`
   },
   series: [{
     type: 'pie',
-    radius: ['50%', '70%'],
+    radius: ['65%', '90%'],
     center: ['40%', '50%'], 
     avoidLabelOverlap: false,
     itemStyle: { borderRadius: 0, borderColor: '#f5f5f5', borderWidth: 8 },
@@ -205,7 +205,7 @@ watch(() => props.summaryData, () => {
 
 <style scoped>
 .left {
-width: 480px;
+width: 100%;
 height: 100%;
 background-color: white;
 padding: 10px;
@@ -229,14 +229,14 @@ flex-direction: column;
   display: flex;
   justify-content: space-between; 
   align-items: center;
-  font-size: 20px;       
+  font-size: 18px;       
   font-weight: bold;     
   color: #333333;
   padding: 12px 16px;
 }
 
 .total-badge {
-  font-size: 18px;       
+  font-size: 16px;       
   font-weight: normal;    
   background-color: #f5f5f5; 
   padding: 4px 12px;      

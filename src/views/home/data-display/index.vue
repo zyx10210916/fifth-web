@@ -151,7 +151,7 @@ const handleFilterApply = (filters: any) => {
   margin-bottom: 0 !important;
   
   .ant-tabs-tab {
-    padding: 16px 0 !important;
+    padding: 10px 0 !important;
     color: rgb(113 113 113 / 100%);
     font-size: 20px;
     margin: 0 1.6rem;
@@ -172,11 +172,10 @@ const handleFilterApply = (filters: any) => {
  
 .content {
   height: calc(100%-75px);
-  width: calc(100%-1
-  5px);
+  width: calc(100%-15px);
   flex: 1;
   overflow: hidden;
-  padding: 15px 0 !important;
+  padding: 10px 0 !important;
   display: flex;
   flex-direction: column;
   margin: 0;

@@ -117,7 +117,7 @@ export default {
     const loading = ref(true);
     const loadingText = ref('正在初始化地图...');
     const layers = ref([]);
-    const selectedHeatmapField = ref("QMRS");
+    const selectedHeatmapField = ref("");
     const activeBasemapId = ref('street');
     const highlightGraphic = shallowRef(null);
  

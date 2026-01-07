@@ -42,7 +42,7 @@ const totalAssetsSum = ref(0);
 const totalProfitSum = ref(0);
 
 const colorPalette = [
-    ['#ffb570', '#ff8800'], ['#85e1ff', '#009dff'], ['#50e3c2', '#11a382'], 
+    ['#ffb570', '#ff8800'], ['#85e1ff', '#009dff'], ['#50e3c2', '#11a382'],
     ['#b6a2de', '#675bba'], ['#ff9db5', '#e03e52']
 ];
 
@@ -69,7 +69,7 @@ const prepareChartData = (rawData: any, dataKey: string, isHorizontal: boolean) 
         return {
             name: reg,
             type: 'bar',
-            barMaxWidth: isHorizontal ? 14 : 16,
+            barMaxWidth: isHorizontal ? 14 : 14,
             data: categories.map(cat => (regionMap.get(cat) / 10000 || 0).toFixed(2)),
             itemStyle: {
                 borderRadius: isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
@@ -86,10 +86,10 @@ const prepareChartData = (rawData: any, dataKey: string, isHorizontal: boolean) 
 
 const getOption = (categories: string[], seriesData: any[], isHorizontal: boolean): EChartsOption => ({
     grid: {
-        top: '20%',
-        left: '3%',
-        right: isHorizontal ? '10%' : '5%',
-        bottom: isHorizontal ? '5%' : '15%',
+        top: '12%',
+        left: isHorizontal ? '0%' : '2%',
+        right: '5%',
+        bottom: '0%',
         containLabel: true
     },
     legend: {
@@ -104,16 +104,28 @@ const getOption = (categories: string[], seriesData: any[], isHorizontal: boolea
     },
     xAxis: isHorizontal ? {
         type: 'value',
-        axisLabel: { color: '#999', fontSize: 14 },
-        splitLine: { lineStyle: { type: 'dashed', color: '#f5f5f5' } }
+        axisLabel: {
+            color: '#999',
+            fontSize: 14,
+            rotate: 45,      
+            margin: 5,   
+            align: 'center',  
+            // verticalAlign: 'middle' 
+        },
+        splitLine: {
+            lineStyle: {
+                type: 'dashed',
+                color: '#f5f5f5'
+            }
+        }
     } : {
         type: 'category',
         data: categories,
-        axisLabel: { 
-            color: '#777', 
+        axisLabel: {
+            color: '#777',
             fontSize: 14,
             interval: 0,
-            rotate: categories.length > 5 ? 45 : 0 
+            rotate: categories.length > 5 ? 50 : 0
         },
         axisLine: { lineStyle: { color: '#eee' } }
     },
@@ -122,7 +134,7 @@ const getOption = (categories: string[], seriesData: any[], isHorizontal: boolea
         data: categories,
         inverse: true,
         axisLabel: { color: '#666', fontSize: 14 },
-        axisLine: { lineStyle: { color: '#eee' } }
+        axisLine: { lineStyle: { color: '#eee' } },
     } : {
         type: 'value',
         axisLabel: { color: '#999', fontSize: 14 },
@@ -176,12 +188,14 @@ watch(() => props.summaryData, processData, { deep: true });
     background-color: #fff;
     border-left: 1px solid #f0f0f0;
 }
+
 .item-box {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
+
 .head {
     display: flex;
     justify-content: space-between;
@@ -190,32 +204,39 @@ watch(() => props.summaryData, processData, { deep: true });
     font-size: 18px;
     font-weight: bold;
 }
+
 .total-badge {
     font-size: 16px;
+    font-weight: normal;
     background-color: #f0f7ff;
     color: #007aff;
-    padding: 4px 12px;
-    border-radius: 20px;
+    padding: 2px 10px;
+    border-radius: 10px;
 }
+
 .content {
     flex: 1;
     position: relative;
     padding: 0 10px 10px 10px;
 }
+
 .unit-tip {
     position: absolute;
     font-size: 14px;
     color: #bbb;
     z-index: 10;
 }
+
 .unit-tip.vertical {
     top: 5px;
     left: 15px;
 }
+
 .unit-tip.horizontal {
     top: 5px;
     right: 20px;
 }
+
 .chart-container {
     width: 100%;
     height: 100%;

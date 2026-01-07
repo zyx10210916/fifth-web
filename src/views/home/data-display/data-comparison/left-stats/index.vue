@@ -105,13 +105,13 @@ const getOption = (categories: string[], seriesData: any[], isHorizontal: boolea
   
   return {
     grid: { 
-      top: isHorizontal ? '20%' : '22%', 
-      left: '3%', 
-      right: isHorizontal ? '8%' : '5%', 
-      bottom: isHorizontal ? '5%' : '12%', 
+      top: '20%', 
+      left: '2%', 
+      right: '2.5%', 
+      bottom: '1%', 
       containLabel: true 
     },
-    legend: { show: true, top: '2%', icon: 'roundRect', textStyle: { fontSize: 14 } },
+    legend: { show: true, top: '0%', icon: 'roundRect', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     xAxis: isHorizontal ? {
       type: 'value',
@@ -176,7 +176,7 @@ watch(() => props.summaryData, processData, { deep: true });
 
 <style scoped>
 .left {
-  width: 480px;
+  width: 100%;
   height: 100%;
   background-color: #fff;
   display: flex;
@@ -196,16 +196,18 @@ watch(() => props.summaryData, processData, { deep: true });
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  padding: 15px;
   font-size: 18px;
   font-weight: bold;
+  color: #333333;
 }
 .total-badge {
-  font-size: 16px;
-  background-color: #f5f5f5;
-  color: #666;
-  padding: 4px 12px;
-  border-radius: 20px;
+  font-size: 16px;       
+  font-weight: normal;    
+  background-color: #f5f5f5; 
+  padding: 2px 10px;      
+  border-radius: 10px;   
+  margin-left: 10px;   
 }
 .content {
   flex: 1;

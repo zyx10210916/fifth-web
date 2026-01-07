@@ -43,10 +43,10 @@ const totalProfitSum = ref(0);
 
 const getBarOption = (data: any[]): EChartsOption => ({
   grid: {
-    top: '15%',
+    top: '8%',
     left: '3%',
-    right: '5%',
-    bottom: '15%',
+    right: '3%',
+    bottom: '0',
     containLabel: true
   },
   tooltip: {
@@ -68,14 +68,14 @@ const getBarOption = (data: any[]): EChartsOption => ({
       fontSize: 14, 
       color: '#666',
       interval: 0,
-      rotate: 50, 
+      rotate: 60, 
       formatter: (val: string) => val.length > 20 ? val.slice(0, 20) + '...' : val
     }
   },
   yAxis: {
     type: 'value',
     splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
-    axisLabel: { fontSize: 16, color: '#999' }
+    axisLabel: { fontSize: 14, color: '#999' }
   },
   series: [{
     type: 'bar',
@@ -151,7 +151,7 @@ watch(() => props.summaryData, processData, { deep: true });
 
 <style scoped>
 .right {
-  width: 480px;
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -172,11 +172,10 @@ watch(() => props.summaryData, processData, { deep: true });
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
   color: #333;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f9f9f9;
+  padding: 10px 12px;
 }
 
 .total-badge {
@@ -185,20 +184,20 @@ watch(() => props.summaryData, processData, { deep: true });
   background-color: #f5f5f5;
   color: #666;
   padding: 4px 12px;
-  border-radius: 20px;
+  border-radius: 18px;
 }
 
 .content {
   flex: 1;
   position: relative;
-  padding: 10px;
+  padding: 5px;
 }
 
 .unit-tip {
   position: absolute;
-  top: 5px;
+  top: 0;
   left: 15px;
-  font-size: 12px;
+  font-size: 14px;
   color: #999;
   z-index: 10;
 }

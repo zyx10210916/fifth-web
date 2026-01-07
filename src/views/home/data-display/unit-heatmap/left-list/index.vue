@@ -120,7 +120,7 @@ const handlePageChange = (page: number) => {
 
 <style scoped lang="scss">
 .left-list-container {
-  width: 560px;
+  width:100%;
   height: 100%;
   background: #ffffff;
   border-radius: 8px;
@@ -195,7 +195,7 @@ const handlePageChange = (page: number) => {
   }
 
   .pagination-footer {
-    padding: 16px 12px;
+    padding: 10px 12px;
     display: flex;
     justify-content: center;
     border-top: 1px solid #ebeef5;
@@ -210,7 +210,7 @@ const handlePageChange = (page: number) => {
 
       .el-pager li {
         font-size: 14px;
-        min-width: 36px;
+        min-width: 32px;
         height: 36px;
         line-height: 36px;
       }

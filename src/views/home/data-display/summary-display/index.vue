@@ -1,8 +1,8 @@
 <template>
   <div class="main-content">
-    <LeftPanel :summary-data="apiData" />
+    <LeftPanel class="left-panel" :summary-data="apiData" />
     <MiddleMap class="map-center" @map-select="handleMapSelectChange" />
-    <RightPanel :summary-data="apiData" />
+    <RightPanel class="right-panel" :summary-data="apiData" />
   </div>
 </template>
 
@@ -66,21 +66,35 @@ onMounted(() => {
 <style scoped>
 .main-content {
   display: flex;
-  height: 100%;
+  height: 100vh; 
   width: 100%;
-  gap: 0px;
+  gap: 10px;
   padding: 0;
   overflow: hidden;
+  align-items: stretch; 
 }
-
-:deep(.middle-map-container) {
-  flex: 1;
+ 
+.left-panel,
+.map-center,
+.right-panel {
   min-width: 0;
-  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column; 
 }
-
+ 
+.left-panel {
+  flex: 1;
+  background: white; 
+}
+ 
 .map-center {
+  flex: 2.5;
+  background: white; 
+}
+ 
+.right-panel {
   flex: 1;
-  min-width: 0;
+  background: white; 
 }
 </style>

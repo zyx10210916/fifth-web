@@ -693,7 +693,6 @@ export default {
 .map-container {
   flex: 1;
   background: white;
-  margin: 0 15px;
   height: 100%;
   border-radius: 6px;
   overflow: hidden;
@@ -815,7 +814,7 @@ export default {
 
 .mapType {
   position: absolute;
-  bottom: 20%;
+  bottom: 2%;
   right: 20px;
   z-index: 100;
   display: flex;
