@@ -229,13 +229,13 @@ export default {
       try {
         const results = await buildingLayer.queryFeatures({
           geometry: geometry,
-          outFields: ["b109_2"],
+          outFields: ["B109"],
           returnGeometry: true
         });
 
         const codes = [...new Set(
           results.features
-            .map(f => f.attributes.b109_2)
+            .map(f => f.attributes.B109)
             .filter(code => code && String(code).trim() !== "")
         )].join(',');
 

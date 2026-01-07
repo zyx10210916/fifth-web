@@ -1,7 +1,6 @@
 <template>
   <div :class="['map-container', { 'full-size': isFullSize }]">
     <div id="viewDiv" style="width: 100%; height: 100vh; position: relative;">
-      <!-- Loading状态提示 -->
       <div v-if="loading" class="loading-overlay">
         <div class="loading-content">
           <div class="spinner"></div>
@@ -26,10 +25,15 @@
         </div>
         <div v-if="panelVisible" class="tree-content">
           <div class="tree-node tree-group"><label>经济普查数据</label></div>
-          <div v-for="layer in economicLayers" :key="layer.id" class="tree-node">
-            <input type="checkbox" :id="layer.id" v-model="layer.visible" @change="updateLayerVisibility(layer)"
+          <div class="tree-node">
+            <input type="checkbox" id="building" v-model="buildingLayer.visible"
+              @change="updateLayerVisibility(buildingLayer)" class="tree-checkbox">
+            <label for="building" class="tree-label">企业建筑点</label>
+          </div>
+          <div class="tree-node">
+            <input type="checkbox" id="house" v-model="houseLayer.visible" @change="updateLayerVisibility(houseLayer)"
               class="tree-checkbox">
-            <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
+            <label for="house" class="tree-label">企业房屋面</label>
           </div>
 
           <div class="tree-node tree-group"><label>基础地理数据</label></div>
@@ -44,7 +48,7 @@
             <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
           </div>
 
-          <div class="tree-node tree-group"><label>文本标注</label></div>
+          <!-- <div class="tree-node tree-group"><label>文本标注</label></div>
           <div class="tree-node">
             <input type="checkbox" id="labelDistrict" v-model="labelVisibility.district" @change="updateLabelVisibility"
               class="tree-checkbox">
@@ -53,13 +57,8 @@
           <div class="tree-node">
             <input type="checkbox" id="labelTown" v-model="labelVisibility.town" @change="updateLabelVisibility"
               class="tree-checkbox">
-            <label for="labelTown" class="tree-label">镇街名称</label>
-          </div>
-          <div class="tree-node">
-            <input type="checkbox" id="labelVillage" v-model="labelVisibility.village" @change="updateLabelVisibility"
-              class="tree-checkbox">
-            <label for="labelVillage" class="tree-label">村居名称</label>
-          </div>
+            <label for="labelTown" class="tree-label">街镇名称</label>
+          </div> -->
         </div>
       </div>
     </div>
@@ -67,359 +66,529 @@
 </template>
 
 <script>
-import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted, computed, watch } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapTools from './MapTools.vue';
+import { getBulletinList } from '@/api/data-display';
 import dtNormal from "@/assets/images/dt-1.png";
 import dtActive from "@/assets/images/dt-2.png";
 import yxtNormal from "@/assets/images/yxt-1.png";
 import yxtActive from "@/assets/images/yxt-2.png";
 
+// 集中管理所有服务URL 
+const SERVICE_URLS = {
+  // 底图服务 
+  basemaps: {
+    street: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/0dd2d428919f40818617fdf05492aaff/DataServer",
+    satellite: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/1e8f0689c7f84b3581bf98449ed8e700/DataServer"
+  },
+
+  // 行政区划矢量数据服务
+  boundary: {
+    vector: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/2baabbc53f404e7a96f9f9da3ec0ec68/DataServer",
+    layers: {
+      district: {
+        layerId: 2,
+        title: "区县行政边界",
+        defaultVisible: true,
+        labelSize: "14px",
+        labelColor: "#222",
+        outlineColor: [70, 130, 180, 0.8]
+      },
+      town: {
+        layerId: 3,
+        title: "街镇行政边界",
+        defaultVisible: false,
+        labelSize: "12px",
+        labelColor: "#444",
+        outlineColor: [210, 105, 30, 0.8]
+      }
+    }
+  },
+
+  // 经济普查数据服务 
+  economic: {
+    house: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&outputFormat=application%2Fjson"
+  },
+
+  // ArcGIS API配置 
+  arcgisApi: {
+    js: "http://10.44.58.28:8000/4.19/init.js",
+    css: "http://10.44.58.28:8000/4.19/esri/themes/light/main.css"
+  }
+};
+
 export default {
   name: 'ArcGISFeatureLayerJsonMix',
   components: { MapTools },
-  props: {isFullSize: { type: Boolean, default: false },showPopup: {type: Boolean, default: false }},
+  props: {
+    isFullSize: { type: Boolean, default: false },
+    showPopup: { type: Boolean, default: false },
+    filterParams: { type: Object, default: () => ({}) }
+  },
+
   setup(props, { emit }) {
+    // ========== 状态管理 ==========
     const view = shallowRef(null);
     const panelVisible = ref(true);
-    const layers = ref([]);
     const activeBasemapId = ref('street');
     const basemapVisible = ref(true);
     const mapModules = shallowRef(null);
     const loading = ref(true);
     const loadingText = ref('正在加载地图...');
-    const mapInitialized = ref(false);
     const labelLayers = shallowRef({});
+    const layers = ref([]);
+
+    // 单独控制企业建筑点和房屋面 
+    const buildingLayer = ref({
+      id: "building",
+      title: "企业建筑点",
+      visible: true,
+      type: "economic"
+    });
+
+    const houseLayer = ref({
+      id: "house",
+      title: "企业房屋面",
+      visible: false,
+      type: "economic",
+      loaded: false
+    });
+
     const labelVisibility = ref({
       district: false,
       town: false,
       village: false
     });
 
+    // ========== 地图配置 ==========
     const mapList = [
       { id: 'street', name: '地图', className: 'mapType-normal', imgNormal: dtNormal, imgActive: dtActive },
       { id: 'satellite', name: '影像图', className: 'mapType-image', imgNormal: yxtNormal, imgActive: yxtActive }
     ];
 
-    const layerConfigs = [
-      { id: "building", title: "企业建筑点", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3Agongbaokuqiyedianpc38_1&maxFeatures=5000&outputFormat=application%2Fjson", defaultVisible: true },
-      { id: "house", title: "企业房屋面", type: "economic", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPFWMpc38&outputFormat=application%2Fjson", defaultVisible: false },
-      { id: "city", title: "市行政区边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPSJpc38&outputFormat=application%2Fjson", defaultVisible: true },
-      { id: "district", title: "区县行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPQXpc38&outputFormat=application%2Fjson", defaultVisible: true },
-      { id: "town", title: "镇街行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPZJpc38&outputFormat=application%2Fjson", defaultVisible: false },
-      { id: "village", title: "村社区行政边界", type: "boundary", url: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPCSQpc38&outputFormat=application%2Fjson", defaultVisible: false }
-    ];
-
+    // ========== 计算属性 ==========
     const economicLayers = computed(() => layers.value.filter(l => l.type === "economic"));
     const boundaryLayers = computed(() => layers.value.filter(l => l.type === "boundary"));
 
-    const calculatePolygonCenter = (rings) => {
-      let x = 0, y = 0, count = 0;
-      const points = Array.isArray(rings[0][0]) ? rings[0] : rings[0];
-
-      points.forEach(coord => {
-        x += (coord[0] || coord.x);
-        y += (coord[1] || coord.y);
-        count++;
-      });
-
-      return [x / count, y / count];
-    };
-
-    const createLabelLayer = async (layerId, features, modules) => {
+    // ========== 地图操作函数 ==========
+    const initializeMap = async () => {
       try {
-        const [FeatureLayer, TextSymbol, LabelClass, Point] = [
-          modules[2], modules[7], modules[8], modules[9]
-        ];
-
-        const labelFields = {
-          district: 'QMC',
-          town: 'JDMC',
-          village: 'XZQMC'
-        };
-
-        const labelField = labelFields[layerId];
-        if (!labelField) return null;
-
-        const graphics = [];
-        const uniqueNames = new Set(); 
-
-        features.forEach((f, index) => {
-          const attr = f.attributes || f.properties;
-          if (!attr) return;
-
-          const textValue = attr[labelField];
-          if (textValue && !uniqueNames.has(textValue)) { 
-            uniqueNames.add(textValue); 
-
-            let centerPoint = null;
-
-            if (f.geometry) {
-              if (f.geometry.type === "point") {
-                centerPoint = f.geometry;
-              } else {
-                centerPoint = f.geometry.centroid || f.geometry.extent.center;
-              }
-            }
-
-            if (centerPoint) {
-              graphics.push({
-                geometry: centerPoint,
-                attributes: {
-                  ObjectID: index,
-                  LABEL_TEXT: String(textValue)
-                }
-              });
-            }
-          }
+        const modules = await loadModules([
+          'esri/Map', 'esri/views/MapView', 'esri/layers/FeatureLayer',
+          'esri/Graphic', 'esri/geometry/SpatialReference', 'esri/Basemap',
+          'esri/layers/TileLayer', 'esri/symbols/TextSymbol', 'esri/layers/support/LabelClass',
+          'esri/geometry/Point', 'esri/symbols/SimpleMarkerSymbol', 'esri/symbols/SimpleFillSymbol'
+        ], {
+          url: SERVICE_URLS.arcgisApi.js,
+          css: SERVICE_URLS.arcgisApi.css
         });
 
-        const styleConfig = {
-          district: { size: 14, color: "#222" },
-          town: { size: 12, color: "#444" },
-          village: { size: 10, color: "#666" }
-        };
+        mapModules.value = modules;
+        const [Map, MapView, FeatureLayer, Graphic, SpatialReference, Basemap, TileLayer] = modules;
 
-        const labelLayer = new FeatureLayer({
-          id: `${layerId}_labels`,
-          source: graphics,
-          fields: [
-            { name: "ObjectID", type: "oid" },
-            { name: "LABEL_TEXT", type: "string" }
-          ],
-          objectIdField: "ObjectID",
-          labelingInfo: [{
-            symbol: new TextSymbol({
-              color: styleConfig[layerId].color,
-              haloColor: "white",
-              haloSize: "1.5px",
-              font: { size: styleConfig[layerId].size, weight: "bold", family: "Microsoft YaHei" }
-            }),
-            labelPlacement: "center-center",
-            labelExpressionInfo: { expression: "$feature.LABEL_TEXT" }
-          }],
-          renderer: {
-            type: "simple",
-            symbol: { type: "simple-marker", size: 0 } 
+        // 创建默认底图 
+        const defaultBasemap = new Basemap({
+          baseLayers: [new TileLayer({ url: SERVICE_URLS.basemaps.street })],
+          id: "street"
+        });
+
+        // 创建地图实例 
+        const map = new Map({
+          basemap: defaultBasemap,
+          layers: []
+        });
+
+        // 设置空间参考
+        const sr = new SpatialReference({ wkid: 4526 });
+
+        // 创建视图 
+        view.value = new MapView({
+          container: "viewDiv",
+          map: map,
+          spatialReference: sr,
+          extent: {
+            xmin: 38392997.07,
+            ymin: 2495903.35,
+            xmax: 38505644.28,
+            ymax: 2648163.20,
+            spatialReference: sr
           },
-          spatialReference: { wkid: 4526 },
-          visible: labelVisibility.value[layerId]
+          ui: { components: [] }
         });
 
-        labelLayers.value[layerId] = labelLayer;
-        return labelLayer;
+        // 设置弹窗 
+        view.value.when(() => {
+          view.value.popup.autoOpenEnabled = props.showPopup;
+        });
+
+        // 加载所有图层
+        await loadAllLayers(map);
+
       } catch (error) {
-        console.error(`创建${layerId}层失败:`, error);
-        return null;
+        console.error("地图初始化失败:", error);
+        loading.value = false;
       }
     };
 
-    const createJsonLayer = async (config) => {
+    // ========== 图层管理函数 ==========
+    const loadAllLayers = async (map) => {
       try {
-        loadingText.value = `正在加载${config.title}...`;
-        const res = await fetch(config.url);
-        const data = await res.json();
-        if (!data.features || data.features.length === 0) return null;
+        // 1. 加载行政区划矢量图层 
+        await loadBoundaryLayers(map);
 
-        const graphics = data.features.map((f, index) => {
-          let geometry = null;
-          const { type, coordinates: coords } = f.geometry;
-          if (type === "Point") geometry = { type: "point", x: coords[0], y: coords[1] };
-          else {
-            const rings = type === "Polygon" ? coords : coords.flat(1);
-            geometry = { type: "polygon", rings };
-          }
-          geometry.spatialReference = { wkid: 4526 };
-          return new mapModules.value[3]({ geometry, attributes: { ...f.properties, ObjectId: index, ObjectID: index } });
-        });
-
-        let popupTemplate = null;
-        if (props.showPopup && config.id === "building") {
-          popupTemplate = {
-            title: "{b102_2}",
-            content: [{
-              type: "fields",
-              fieldInfos: [
-                { fieldName: "b109_2", label: "统一社会信用代码" },
-                { fieldName: "zysr", label: "主营收入" },
-                { fieldName: "zczj", label: "资产总计" },
-                { fieldName: "qmrs", label: "期末人数" },
-                { fieldName: "cyrs", label: "专业人数" }
-              ]
-            }]
-          };
-        }
-
-        const layerColors = {
-          city: [144, 238, 144, 0.1],  
-          district: [173, 216, 230, 0.3], 
-          town: [255, 218, 185, 0.2],     
-          village: [221, 160, 221, 0.2]
-        };
-
-        const outlineColors = {
-          city: [34, 139, 34, 0.8],
-          district: [70, 130, 180, 0.8],
-          town: [210, 105, 30, 0.8],
-          village: [147, 112, 219, 0.8]
-        };
-        const layer = new mapModules.value[2]({
-          source: graphics,
-          id: config.id,
-          title: config.title,
-          objectIdField: "ObjectId",
-          fields: [
-            { name: "ObjectId", type: "oid" },
-            ...Object.keys(data.features[0].properties).map(key => ({ name: key, type: "string" }))
-          ],
-          popupTemplate: popupTemplate, 
-          renderer: config.type === "economic"
-            ? (data.features[0].geometry.type === "Point"
-              ? { type: "simple", symbol: { type: "simple-marker", color: [255, 165, 0, 0.8], size: 8 } }
-              : { type: "simple", symbol: { type: "simple-fill", color: [51, 136, 255, 0.1], outline: { color: [51, 136, 255, 0.8], width: 1.5 } } })
-            : {
-              type: "simple",
-              symbol: {
-                type: "simple-fill",
-                color: layerColors[config.id] || [51, 136, 255, 0.1],
-                outline: {
-                  color: outlineColors[config.id] || [51, 136, 255, 0.8],
-                  width: 1.5
-                }
-              }
-            },
-          spatialReference: { wkid: 4526 },
-          visible: config.defaultVisible
-        });
-
-        layers.value.push({ id: config.id, title: config.title, visible: config.defaultVisible, instance: layer, type: config.type });
-        return layer;
-      } catch (e) { return null; }
-    };
-
-    const loadLayersSequentially = async (map) => {
-      try {
-        const defaultVisibleConfigs = layerConfigs.filter(c => c.defaultVisible);
-        const defaultLayers = await Promise.all(defaultVisibleConfigs.map(config => createJsonLayer(config)));
-
-        defaultLayers.forEach(layer => {
-          if (layer) map.add(layer);
-        });
+        // 2. 加载经济普查数据图层 
+        await loadEconomicLayers(map);
 
         loading.value = false;
-
-        const otherConfigs = layerConfigs.filter(c => !c.defaultVisible);
-
-        const otherLayers = await Promise.all(otherConfigs.map(async (config) => {
-          const layer = await createJsonLayer(config);
-
-          if (config.id === 'village' && layer) {
-            console.log("检测到村社区图层，开始异步创建标注...");
-            createLabelsAsync(layer, map);
-          }
-          return layer;
-        }));
-
-        console.log("所有非预置图层数据已加载就绪");
-
       } catch (error) {
         console.error("图层加载失败:", error);
         loading.value = false;
       }
     };
 
-    const createLabelsAsync = async (villageLayer, map) => {
+    /**
+     * 加载行政区划矢量图层
+     */
+    const loadBoundaryLayers = async (map) => {
       try {
-        const featureSet = await villageLayer.queryFeatures();
-        const features = featureSet.features;
+        const [FeatureLayer, TextSymbol] = mapModules.value.slice(2, 4);
 
-        if (!features || features.length === 0) return;
+        // 加载所有行政区划图层
+        for (const [key, config] of Object.entries(SERVICE_URLS.boundary.layers)) {
+          const layer = new FeatureLayer({
+            url: `${SERVICE_URLS.boundary.vector}/${config.layerId}`,
+            id: key,
+            title: config.title,
+            outFields: ["*"],
+            spatialReference: { wkid: 4526 },
+            renderer: {
+              type: "simple",
+              symbol: {
+                type: "simple-fill",
+                color: [0, 0, 0, 0], // 透明填充
+                outline: {
+                  color: config.outlineColor,
+                  width: 1.5
+                }
+              }
+            },
+            popupTemplate: {
+              title: "{NAME}",
+              content: config.title
+            },
+            labelingInfo: [{
+              symbol: {
+                type: "text",
+                color: config.labelColor,
+                haloColor: "white",
+                haloSize: "1.5px",
+                font: {
+                  size: config.labelSize,
+                  weight: "bold",
+                  family: "Microsoft YaHei"
+                }
+              },
+              labelExpressionInfo: { expression: "$feature.NAME" },
+              labelPlacement: "center-center",
+              minScale: key === 'district' ? 100000 : 50000,
+              maxScale: 0
+            }],
+            labelsVisible: labelVisibility.value[key.replace('label', '').toLowerCase()] || false,
+            visible: config.defaultVisible
+          });
 
-        const dLayer = await createLabelLayer('district', features, mapModules.value);
-        if (dLayer) map.add(dLayer);
+          layer.when(() => {
+            console.log(`${config.title}图层加载完成`);
+          }, (error) => {
+            console.error(`${config.title}图层加载失败:`, error);
+          });
 
-        const tLayer = await createLabelLayer('town', features, mapModules.value);
-        if (tLayer) map.add(tLayer);
-
-        const vLayer = await createLabelLayer('village', features, mapModules.value);
-        if (vLayer) map.add(vLayer);
-
-        console.log('所有标注层创建完成');
-      } catch (error) {
-        console.error("标注图层创建失败:", error);
-      }
-    };
-
-    const updateLabelVisibility = () => {
-      if (!view.value || !labelLayers.value) return;
-
-      Object.entries(labelVisibility.value).forEach(([layerId, visible]) => {
-        const labelLayer = labelLayers.value[layerId];
-        if (labelLayer) {
-          labelLayer.visible = visible;
+          map.add(layer);
+          layers.value.push({
+            id: key,
+            title: config.title,
+            visible: config.defaultVisible,
+            instance: layer,
+            type: "boundary"
+          });
         }
-      });
-    };
-
-    const handleMapSelection = (uniqueCodeStr) => {
-      console.log('地图中转层接收到代码:', uniqueCodeStr);
-      emit('map-select', uniqueCodeStr);
-    };
-
-    onMounted(async () => {
-      try {
-        const modules = await loadModules([
-          'esri/Map', 'esri/views/MapView', 'esri/layers/FeatureLayer',
-          'esri/Graphic', 'esri/geometry/SpatialReference', 'esri/Basemap',
-          'esri/layers/TileLayer', 'esri/symbols/TextSymbol', 'esri/layers/support/LabelClass',
-          'esri/geometry/Point'
-        ], {
-          url: 'http://10.44.58.28:8000/4.19/init.js',
-          css: 'http://10.44.58.28:8000/4.19/esri/themes/light/main.css'
-        });
-
-        mapModules.value = modules;
-        const [Map, MapView, FeatureLayer, Graphic, SpatialReference, Basemap, TileLayer] = modules;
-
-        const defaultBasemap = new Basemap({
-          baseLayers: [new TileLayer({ url: "http://192.168.3.140:6080/arcgis/rest/services/fw_dt/MapServer" })],
-          id: "street"
-        });
-
-        const map = new Map({
-          basemap: defaultBasemap,
-          layers: [] 
-        });
-
-        const sr = new SpatialReference({ wkid: 4526 });
-
-        view.value = new MapView({
-          container: "viewDiv",
-          map: map,
-          spatialReference: sr, 
-          extent: {
-            xmin: 38392997.07,
-            ymin: 2495903.35,
-            xmax: 38505644.28,
-            ymax: 2648163.20,
-            spatialReference: sr 
-          },
-          ui: { components: [] }
-        });
-        window.view = view.value;
-
-        mapInitialized.value = true;
-
-        view.value.when(() => {
-          view.value.popup.autoOpenEnabled = props.showPopup;
-        });
-
-        loadLayersSequentially(map);
       } catch (error) {
-        console.error("Map Initialization Failed:", error);
-        loading.value = false;
+        console.error("加载行政区划图层失败:", error);
+        throw error;
       }
-    });
+    };
+
+    /**
+     * 加载经济普查数据图层 
+     */
+    const loadEconomicLayers = async (map) => {
+      try {
+        // 只加载建筑点图层，房屋面不自动加载
+        const buildingLayerInstance = await createBulletinListLayer(buildingLayer.value);
+        if (buildingLayerInstance) {
+          map.add(buildingLayerInstance);
+        }
+
+      } catch (error) {
+        console.error("加载经济普查图层失败:", error);
+        throw error;
+      }
+    };
+
+    /**
+     * 从getBulletinList接口创建企业点图层 
+     */
+    const createBulletinListLayer = async (config) => {
+      try {
+        loadingText.value = `正在加载${config.title}...`;
+        const res = await getBulletinList({ pageNo: 1, pageSize: 5000, ...props.filterParams });
+
+        if (!res?.data?.list) return null;
+
+        const [Map, MapView, FeatureLayer, Graphic] = mapModules.value;
+
+        const validGraphics = res.data.list
+          .map((item, index) => {
+            const x = parseFloat(item.XZ_AXIS);
+            const y = parseFloat(item.YZ_AXIS);
+            if (isNaN(x) || isNaN(y)) return null;
+
+            return new Graphic({
+              geometry: {
+                type: "point",
+                x: x,
+                y: y,
+                spatialReference: { wkid: 4526 }
+              },
+              attributes: {
+                ObjectId: index,
+                B109: item.B109,
+                ZYSR: item.ZYSR,
+                ZCZJ: item.ZCZJ,
+                QMRS: item.QMRS,
+                CYRS: item.CYRS
+              }
+            });
+          })
+          .filter(g => g !== null);
+
+        const layer = new FeatureLayer({
+          source: validGraphics,
+          id: config.id,
+          title: config.title,
+          objectIdField: "ObjectId",
+          fields: [
+            { name: "ObjectId", type: "oid" },
+            { name: "B109", type: "string" },
+            { name: "ZYSR", type: "string" },
+            { name: "ZCZJ", type: "string" },
+            { name: "QMRS", type: "string" },
+            { name: "CYRS", type: "string" }
+          ],
+          renderer: {
+            type: "simple",
+            symbol: {
+              type: "simple-marker",
+              color: [156, 120, 0, 0.8],
+              size: "8px",
+              outline: { color: [255, 255, 255], width: 1 }
+            }
+          },
+          spatialReference: { wkid: 4526 },
+          visible: config.visible,
+          popupTemplate: createPopupTemplate(config)
+        });
+        return layer;
+      } catch (e) {
+        console.error("创建图层失败:", e);
+        return null;
+      }
+    };
+
+    /**
+     * 创建JSON图层（用于企业房屋面数据）
+     */
+    const createJsonLayer = async (config) => {
+      try {
+        loadingText.value = `正在加载${config.title}...`;
+        const res = await fetch(config.url);
+        const data = await res.json();
+
+        if (!data.features || data.features.length === 0) {
+          console.warn(`${config.title} 接口返回数据为空`);
+          return null;
+        }
+
+        const FeatureLayer = mapModules.value[2];
+        const Graphic = mapModules.value[3];
+        const SimpleFillSymbol = mapModules.value[11];
+
+        const graphics = data.features.map((f, index) => {
+          const { type, coordinates: coords } = f.geometry;
+          let geometry = null;
+
+          if (type === "MultiPolygon") {
+            geometry = {
+              type: "polygon",
+              rings: coords.flat(1),
+              spatialReference: { wkid: 4526 }
+            };
+          } else if (type === "Polygon") {
+            geometry = {
+              type: "polygon",
+              rings: coords,
+              spatialReference: { wkid: 4526 }
+            };
+          } else if (type === "Point") {
+            geometry = {
+              type: "point",
+              x: coords[0],
+              y: coords[1],
+              spatialReference: { wkid: 4526 }
+            };
+          }
+
+          if (!geometry) return null;
+
+          return new Graphic({
+            geometry: geometry,
+            attributes: {
+              ...f.properties,
+              ObjectId: index
+            }
+          });
+        }).filter(g => g !== null);
+
+        const fillSymbol = new SimpleFillSymbol({
+          color: [255, 215, 0, 0.3],
+          outline: {
+            color: [255, 140, 0, 1],
+            width: 1.5
+          }
+        });
+
+        const layer = new FeatureLayer({
+          source: graphics,
+          id: config.id,
+          title: config.title,
+          objectIdField: "ObjectId",
+          fields: [
+            { name: "ObjectId", type: "oid" },
+            ...Object.keys(data.features[0].properties || {}).map(key => ({
+              name: key,
+              type: "string"
+            }))
+          ],
+          renderer: {
+            type: "simple",
+            symbol: fillSymbol
+          },
+          popupTemplate: createPopupTemplate(config),
+          spatialReference: { wkid: 4526 },
+          visible: config.defaultVisible
+        });
+
+        const existingIdx = layers.value.findIndex(l => l.id === config.id);
+        if (existingIdx > -1) {
+          layers.value[existingIdx].instance = layer;
+        } else {
+          layers.value.push({
+            id: config.id,
+            title: config.title,
+            visible: config.defaultVisible,
+            instance: layer,
+            type: config.type
+          });
+        }
+
+        return layer;
+      } catch (e) {
+        console.error(`创建${config.title}图层具体错误:`, e);
+        return null;
+      }
+    };
+
+    // ========== 辅助函数 ==========
+    const createGeometryFromFeature = (feature) => {
+      const { type, coordinates: coords } = feature.geometry;
+
+      if (type === "Point") {
+        return { type: "point", x: coords[0], y: coords[1] };
+      } else {
+        const rings = type === "Polygon" ? coords : coords.flat(1);
+        return { type: "polygon", rings };
+      }
+    };
+
+    const createPopupTemplate = (config) => {
+      if (!props.showPopup || config.id !== "building") return null;
+
+      return {
+        title: "{B109}",
+        content: [{
+          type: "fields",
+          fieldInfos: [
+            { fieldName: "ZYSR", label: "主营收入" },
+            { fieldName: "ZCZJ", label: "资产总计" },
+            { fieldName: "QMRs", label: "期末人数" },
+            { fieldName: "CYRS", label: "专业人数" }
+          ]
+        }]
+      };
+    };
+
+    const createRenderer = (config, geometryType) => {
+      const [SimpleMarkerSymbol, SimpleFillSymbol] = mapModules.value.slice(7, 9);
+
+      if (geometryType === "point") {
+        return {
+          type: "simple",
+          symbol: new SimpleMarkerSymbol({
+            color: [56, 168, 0, 0.8],
+            size: "8px",
+            outline: {
+              color: [255, 255, 255],
+              width: 1
+            }
+          })
+        };
+      } else {
+        return {
+          type: "simple",
+          symbol: new SimpleFillSymbol({
+            color: [56, 168, 0, 0.4],
+            outline: {
+              color: [255, 255, 255],
+              width: 1
+            }
+          })
+        };
+      }
+    };
+
+    const getBoundaryColor = (layerId) => {
+      const colors = [
+        [34, 139, 34, 0.8],    // 市级 - 绿色
+        [70, 130, 180, 0.8],   // 区级 - 蓝色 
+        [210, 105, 30, 0.8]    // 镇街级 - 橙色
+      ];
+      return colors[layerId] || [0, 0, 0, 0.8];
+    };
+
+    // ========== UI交互函数 ==========
+    const handleBasemapChange = async (id) => {
+      if (activeBasemapId.value === id || !view.value || !mapModules.value) return;
+
+      const [Basemap, TileLayer] = mapModules.value.slice(5, 7);
+      const url = SERVICE_URLS.basemaps[id];
+
+      view.value.map.basemap = new Basemap({
+        baseLayers: [new TileLayer({ url })],
+        id
+      });
+      activeBasemapId.value = id;
+    };
 
     const updateLayerVisibility = async (layer) => {
       try {
@@ -428,35 +597,34 @@ export default {
 
         const targetLayer = view.value?.map.findLayerById(layer.id);
 
-        if (!targetLayer) { 
-          const config = layerConfigs.find(c => c.id === layer.id);
-          if (!config) return;
-
-          const layerData = layers.value.find(l => l.id === layer.id);
-
-          if (layerData) {
-            const rawInstance = toRaw(layerData.instance);
-            view.value.map.add(rawInstance);
-            rawInstance.visible = layer.visible; 
-
-            if (config.id === 'village') {
-              await createLabelsAsync(rawInstance, view.value.map);
-            }
-          } else {
-            const newLayer = await createJsonLayer(config);
-            if (newLayer) {
+        if (targetLayer) {
+          targetLayer.visible = layer.visible;
+        } else {
+          if (layer.id === "house" && layer.visible) {
+            const houseConfig = {
+              id: "house",
+              title: "企业房屋面",
+              type: "economic",
+              url: SERVICE_URLS.economic.house,
+              defaultVisible: true
+            };
+            const newLayer = await createJsonLayer(houseConfig);
+            if (newLayer && view.value?.map) {
               view.value.map.add(newLayer);
-              newLayer.visible = layer.visible; 
-              if (config.id === 'village') {
-                await createLabelsAsync(newLayer, view.value.map);
-              }
+              layer.loaded = true;
+            }
+          } else if (layer.id === "building") {
+            const newLayer = await createBulletinListLayer(layer);
+            if (newLayer && view.value?.map) {
+              view.value.map.add(newLayer);
             }
           }
-        } else {
-          targetLayer.visible = layer.visible;
         }
       } catch (error) {
         console.error(`更新图层 ${layer.id} 可见性失败:`, error);
+        if (layer.id === "house") {
+          layer.visible = false;
+        }
       } finally {
         loading.value = false;
       }
@@ -468,26 +636,54 @@ export default {
       }
     };
 
-    const handleBasemapChange = async (id) => {
-      if (activeBasemapId.value === id || !view.value || !mapModules.value) return;
-      const [Basemap, TileLayer] = mapModules.value.slice(5, 7);
-      const url = id === 'street'
-        ? "http://192.168.3.140:6080/arcgis/rest/services/fw_dt/MapServer"
-        : "http://192.168.94.114/arcgis/rest/services/GZ2000_ZW_YXDT_2019/MapServer";
-
-      view.value.map.basemap = new Basemap({ baseLayers: [new TileLayer({ url })], id: id });
-      activeBasemapId.value = id;
+    const updateLabelVisibility = () => {
+      Object.entries(labelVisibility.value).forEach(([type, visible]) => {
+        const layer = view.value?.map.findLayerById(type === 'district' ? 'district' : 'town');
+        if (layer) {
+          layer.labelsVisible = visible;
+        }
+      });
     };
 
-    const togglePanel = () => { panelVisible.value = !panelVisible.value; };
+    const handleMapSelection = (uniqueCodeStr) => {
+      emit('map-select', uniqueCodeStr);
+    };
 
-    onUnmounted(() => { view.value?.destroy(); });
+    const togglePanel = () => {
+      panelVisible.value = !panelVisible.value;
+    };
 
+    // ========== 生命周期钩子 ==========
+    onMounted(initializeMap);
+    onUnmounted(() => view.value?.destroy());
+
+    // 监听filterParams变化，重新加载企业点数据
+    watch(() => props.filterParams, () => {
+      if (buildingLayer.value.visible) {
+        updateLayerVisibility(buildingLayer.value);
+      }
+    }, { deep: true });
+
+    // ========== 暴露给模板的属性和方法 ==========
     return {
-      view, panelVisible, economicLayers, boundaryLayers, mapList,
-      activeBasemapId, basemapVisible, loading, loadingText, labelVisibility,
-      handleBasemapChange,handleMapSelection,handleSelectionComplete: handleMapSelection,
-      updateLayerVisibility, updateBasemapVisibility, updateLabelVisibility, togglePanel
+      view,
+      panelVisible,
+      economicLayers,
+      boundaryLayers,
+      buildingLayer,
+      houseLayer,
+      mapList,
+      activeBasemapId,
+      basemapVisible,
+      loading,
+      loadingText,
+      labelVisibility,
+      handleBasemapChange,
+      handleMapSelection,
+      updateLayerVisibility,
+      updateBasemapVisibility,
+      updateLabelVisibility,
+      togglePanel
     };
   }
 };
@@ -619,7 +815,7 @@ export default {
 
 .mapType {
   position: absolute;
-  bottom: 30px;
+  bottom: 20%;
   right: 20px;
   z-index: 100;
   display: flex;

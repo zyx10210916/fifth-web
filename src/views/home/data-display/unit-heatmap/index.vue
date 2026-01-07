@@ -34,7 +34,7 @@ const unitListData = ref({
   pageNum: 1,
   pageSize: 20
 });
-const mapPointsData = ref([]);
+const mapPointsData = ref<any[]>([]);
 const listLoading = ref(false);
 const mapLoading = ref(false);
  
@@ -45,6 +45,7 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
     const params = {
       pageNo: pageNum,
       pageSize: 20,
+      "area": "",
       ...extraParams 
     };
     
@@ -65,28 +66,41 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
   }
 };
  
-// 右侧地图数据请求
-const fetchMapPoints = async (extraParams = {}) => {
+// 右侧地图数据请求（分批加载）
+const fetchMapPoints = async (pageNo = 1, extraParams = {}) => {
   mapLoading.value = true;
   try {
+    const pageSize = 1000; // 每批2000条
+    
     const res = await getBulletinList({
-      pageNo: 1,
-      pageSize: 1000, 
+      pageNo,
+      pageSize,
+      "area": "",
       ...extraParams 
     });
     
-    if (res?.data?.list) {
-      mapPointsData.value = res.data.list.map(item => ({
+    if (res?.data?.list && res.data.list.length > 0) {
+      // 转换数据格式
+      const transformedPoints = res.data.list.map(item => ({
         ...item,
         XZ_AXIS: item.XZ_AXIS,
         YZ_AXIS: item.YZ_AXIS,
         B109: item.B109,
-        WYM: item.WYM, 
+        WYM: item.WYM,
         ZCZJ: item.ZCZJ,
         ZYSR: item.ZYSR,
         QMRS: item.QMRS,
         CYRS: item.CYRS 
       }));
+      
+      // 追加新数据到现有数据 
+      mapPointsData.value = [...mapPointsData.value, ...transformedPoints];
+      
+      // 检查是否还有更多数据可以加载
+      if (res.data.list.length === pageSize && pageNo * pageSize < res.data.total) {
+        // 继续加载下一页
+        fetchMapPoints(pageNo + 1, extraParams);
+      }
     }
   } catch (error) {
     console.error('获取地图点位数据失败:', error);
@@ -112,12 +126,13 @@ const handlePageChange = (page: number) => {
  
 watch(() => props.filterParams, (newVal) => {
   fetchUnitList(1, newVal || {});
-  fetchMapPoints(newVal || {});
+  mapPointsData.value = []; // 清空现有数据 
+  fetchMapPoints(1, newVal || {}); 
 }, { deep: true });
  
 onMounted(() => {
   fetchUnitList(1, props.filterParams || {});
-  fetchMapPoints(props.filterParams || {});
+  fetchMapPoints(1, props.filterParams || {}); 
 });
 </script>
  
