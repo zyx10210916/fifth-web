@@ -108,7 +108,7 @@ const SERVICE_URLS = {
 
   // 经济普查数据服务 
   economic: {
-    house: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&outputFormat=application%2Fjson"
+    house: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&maxFeatures=5000&outputFormat=application%2Fjson"
   },
 
   // ArcGIS API配置 
@@ -138,6 +138,7 @@ export default {
     const loadingText = ref('正在加载地图...');
     const labelLayers = shallowRef({});
     const layers = ref([]);
+    const highlightRef = shallowRef(null);
 
     // 单独控制企业建筑点和房屋面 
     const buildingLayer = ref({
@@ -178,7 +179,8 @@ export default {
           'esri/Map', 'esri/views/MapView', 'esri/layers/FeatureLayer',
           'esri/Graphic', 'esri/geometry/SpatialReference', 'esri/Basemap',
           'esri/layers/TileLayer', 'esri/symbols/TextSymbol', 'esri/layers/support/LabelClass',
-          'esri/geometry/Point', 'esri/symbols/SimpleMarkerSymbol', 'esri/symbols/SimpleFillSymbol'
+          'esri/geometry/Point', 'esri/symbols/SimpleMarkerSymbol', 'esri/symbols/SimpleFillSymbol',
+          'esri/tasks/support/Query',
         ], {
           url: SERVICE_URLS.arcgisApi.js,
           css: SERVICE_URLS.arcgisApi.css
@@ -576,6 +578,85 @@ export default {
       return colors[layerId] || [0, 0, 0, 0.8];
     };
 
+    const setupHouseClickHandler = (houseLayerInstance) => {
+      if (!view.value || !mapModules.value) return;
+
+      // 1. 统一获取模块，避免使用容易出错的 slice 索引
+      const [
+        Map, MapView, FeatureLayer, Graphic, SpatialReference,
+        Basemap, TileLayer, TextSymbol, LabelClass, Point,
+        SimpleMarkerSymbol, SimpleFillSymbol, Query
+      ] = mapModules.value;
+
+      // 清除之前高亮的辅助函数
+      const clearHighlight = () => {
+        if (highlightRef.value) {
+          view.value.graphics.remove(highlightRef.value);
+          highlightRef.value = null;
+        }
+      };
+
+      // 2. 监听点击事件
+      view.value.on("click", async (event) => {
+        try {
+          // 每次点击先清空旧的高亮
+          clearHighlight();
+
+          // 3. 射线检测：只关注房屋面图层
+          const hitTestResult = await view.value.hitTest(event);
+          const houseHit = hitTestResult.results.find(
+            (result) => result.graphic?.layer?.id === "house"
+          );
+
+          if (!houseHit) return;
+
+          const clickedGraphic = houseHit.graphic;
+
+          // 4. 创建自定义高亮 Graphic（不再依赖系统默认的黑色框）
+          const highlightGraphic = new Graphic({
+            geometry: clickedGraphic.geometry,
+            symbol: new SimpleFillSymbol({
+              color: [0, 255, 255, 0.2], // 青色透明填充
+              outline: {
+                color: [0, 255, 255, 1], // 亮青色边框
+                width: 2.5
+              }
+            })
+          });
+
+          view.value.graphics.add(highlightGraphic);
+          highlightRef.value = highlightGraphic;
+
+          // 5. 空间查询：查找该面内的企业点
+          const buildingLayer = view.value.map.findLayerById("building");
+          if (buildingLayer) {
+            const query = new Query();
+            query.geometry = clickedGraphic.geometry;
+            query.spatialRelationship = "intersects"; // 相交查询
+            query.outFields = ["B109"];
+            query.returnGeometry = false;
+
+            const result = await buildingLayer.queryFeatures(query);
+
+            if (result.features.length > 0) {
+              const codes = result.features
+                .map(f => f.attributes.B109)
+                .filter(Boolean);
+              emit('map-select', codes.join(','));
+            } else {
+              // 提示无数据
+              loadingText.value = "提示：该区域内未发现企业点";
+              loading.value = true;
+              setTimeout(() => (loading.value = false), 1500);
+              emit('map-select', 'none');
+            }
+          }
+        } catch (error) {
+          console.error("房屋面点击处理异常:", error);
+        }
+      });
+    };
+
     // ========== UI交互函数 ==========
     const handleBasemapChange = async (id) => {
       if (activeBasemapId.value === id || !view.value || !mapModules.value) return;
@@ -612,6 +693,9 @@ export default {
             if (newLayer && view.value?.map) {
               view.value.map.add(newLayer);
               layer.loaded = true;
+
+              // 添加房屋面点击事件监听
+              setupHouseClickHandler(newLayer);
             }
           } else if (layer.id === "building") {
             const newLayer = await createBulletinListLayer(layer);
@@ -655,7 +739,12 @@ export default {
 
     // ========== 生命周期钩子 ==========
     onMounted(initializeMap);
-    onUnmounted(() => view.value?.destroy());
+    onUnmounted(() => {
+      if (highlightRef.value) {
+        view.value?.graphics.remove(highlightRef.value);
+      }
+      view.value?.destroy();
+    });
 
     // 监听filterParams变化，重新加载企业点数据
     watch(() => props.filterParams, () => {
