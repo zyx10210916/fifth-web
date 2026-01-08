@@ -30,9 +30,9 @@
               @change="updateLayerVisibility(buildingLayer)" class="tree-checkbox">
             <label for="building" class="tree-label">企业建筑点</label>
           </div>
-          <div class="tree-node">
-            <input type="checkbox" id="house" v-model="houseLayer.visible" @change="updateLayerVisibility(houseLayer)"
-              class="tree-checkbox">
+          <div v-if="houseLayer.loaded" class="tree-node">
+            <input type="checkbox" id="house" v-model="houseLayer.visible" 
+              @change="updateLayerVisibility(houseLayer)" class="tree-checkbox">
             <label for="house" class="tree-label">企业房屋面</label>
           </div>
 
@@ -54,7 +54,7 @@
 </template>
 
 <script>
-import { ref, shallowRef, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted, computed, watch, markRaw } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapTools from './MapTools.vue';
 import { getBulletinList } from '@/api/data-display';
@@ -96,7 +96,7 @@ const SERVICE_URLS = {
 
   // 经济普查数据服务 
   economic: {
-    house: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&maxFeatures=5000&outputFormat=application%2Fjson"
+    house: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&outputFormat=application%2Fjson"
   },
 
   // ArcGIS API配置 
@@ -141,7 +141,8 @@ export default {
       title: "企业房屋面",
       visible: false,
       type: "economic",
-      loaded: false
+      isFetching: false, 
+      loaded: false      
     });
 
     const labelVisibility = ref({
@@ -214,34 +215,22 @@ export default {
           view.value.popup.autoOpenEnabled = props.showPopup;
         });
 
-        // 加载所有图层
-        await loadAllLayers(map);
-
-      } catch (error) {
-        console.error("地图初始化失败:", error);
-        loading.value = false;
-      }
-    };
-
-    // ========== 图层管理函数 ==========
-    const loadAllLayers = async (map) => {
-      try {
-        // 加载行政区划矢量图层 
+        // 加载图层
         await loadBoundaryLayers(map);
+        await loadBuildingPoints(map);
+        loading.value = false; 
+        LoadHouseLayer(map);
 
-        // 加载经济普查数据图层 
-        await loadEconomicLayers(map);
-
-        loading.value = false;
       } catch (error) {
-        console.error("图层加载失败:", error);
         loading.value = false;
       }
     };
 
     /**
-     * 加载行政区划矢量图层
+     * 加载图层
      */
+
+    // 加载行政区图层
     const loadBoundaryLayers = async (map) => {
       try {
         const [FeatureLayer, TextSymbol] = mapModules.value.slice(2, 4);
@@ -311,21 +300,45 @@ export default {
       }
     };
 
-    /**
-     * 加载经济普查数据图层 
-     */
-    const loadEconomicLayers = async (map) => {
-      try {
-        const buildingLayerInstance = await createBulletinListLayer(buildingLayer.value);
-        if (buildingLayerInstance) {
-          map.add(buildingLayerInstance);
-        }
 
-      } catch (error) {
-        console.error("加载经济普查图层失败:", error);
-        throw error;
+    // 加载建筑点
+    const loadBuildingPoints = async (map) => {
+      const instance = await createBulletinListLayer(buildingLayer.value);
+      if (instance) {
+        map.add(instance);
+        layers.value.push({ 
+          ...buildingLayer.value, 
+          instance: markRaw(instance) 
+        });
       }
     };
+
+    // 加载房屋面
+    const LoadHouseLayer = async (map) => {
+    if (houseLayer.value.loaded || houseLayer.value.isFetching) return;
+    
+    houseLayer.value.isFetching = true;
+    try {
+      const houseConfig = {
+        id: "house",
+        title: "企业房屋面",
+        type: "economic",
+        url: SERVICE_URLS.economic.house,
+        defaultVisible: false 
+      };
+
+      const newLayer = await createJsonLayer(houseConfig);
+      
+      if (newLayer) {
+        map.add(newLayer);
+        houseLayer.value.loaded = true;
+      }
+    } catch (e) {
+      console.error("房屋面异步加载失败:", e);
+    } finally {
+      houseLayer.value.isFetching = false;
+    }
+  };
 
     /**
      * 从getBulletinList接口创建企业点图层 
@@ -402,100 +415,61 @@ export default {
      */
     const createJsonLayer = async (config) => {
       try {
-        loadingText.value = `正在加载${config.title}...`;
         const res = await fetch(config.url);
         const data = await res.json();
+        if (!data.features || data.features.length === 0) return null;
 
-        if (!data.features || data.features.length === 0) {
-          console.warn(`${config.title} 接口返回数据为空`);
-          return null;
-        }
-
+        const [,,, Graphic,,,,, SimpleFillSymbol] = mapModules.value;
         const FeatureLayer = mapModules.value[2];
-        const Graphic = mapModules.value[3];
-        const SimpleFillSymbol = mapModules.value[11];
 
         const graphics = data.features.map((f, index) => {
           const { type, coordinates: coords } = f.geometry;
           let geometry = null;
-
           if (type === "MultiPolygon") {
-            geometry = {
-              type: "polygon",
-              rings: coords.flat(1),
-              spatialReference: { wkid: 4526 }
-            };
+            geometry = { type: "polygon", rings: coords.flat(1), spatialReference: { wkid: 4526 } };
           } else if (type === "Polygon") {
-            geometry = {
-              type: "polygon",
-              rings: coords,
-              spatialReference: { wkid: 4526 }
-            };
-          } else if (type === "Point") {
-            geometry = {
-              type: "point",
-              x: coords[0],
-              y: coords[1],
-              spatialReference: { wkid: 4526 }
-            };
+            geometry = { type: "polygon", rings: coords, spatialReference: { wkid: 4526 } };
           }
-
           if (!geometry) return null;
-
           return new Graphic({
             geometry: geometry,
-            attributes: {
-              ...f.properties,
-              ObjectId: index
-            }
+            attributes: { ...f.properties, ObjectId: index }
           });
         }).filter(g => g !== null);
-
-        const fillSymbol = new SimpleFillSymbol({
-          color: [255, 215, 0, 0.3],
-          outline: {
-            color: [255, 140, 0, 1],
-            width: 1.5
-          }
-        });
 
         const layer = new FeatureLayer({
           source: graphics,
           id: config.id,
           title: config.title,
           objectIdField: "ObjectId",
-          fields: [
-            { name: "ObjectId", type: "oid" },
-            ...Object.keys(data.features[0].properties || {}).map(key => ({
-              name: key,
-              type: "string"
-            }))
-          ],
+          fields: [{ name: "ObjectId", type: "oid" }],
           renderer: {
             type: "simple",
-            symbol: fillSymbol
+            symbol: {
+              type: "simple-fill",
+              color: [0, 197, 255, 0.3],
+              outline: { color: [0, 112, 255, 0.8], width: 1.5 }
+            }
           },
-          popupTemplate: createPopupTemplate(config),
           spatialReference: { wkid: 4526 },
           visible: config.defaultVisible
         });
 
         const existingIdx = layers.value.findIndex(l => l.id === config.id);
         if (existingIdx > -1) {
-          layers.value[existingIdx].instance = layer;
+          layers.value[existingIdx].instance = markRaw(layer);
         } else {
           layers.value.push({
             id: config.id,
             title: config.title,
             visible: config.defaultVisible,
-            instance: layer,
+            instance: markRaw(layer),
             type: config.type
           });
         }
-
         return layer;
       } catch (e) {
-        console.error(`创建${config.title}图层具体错误:`, e);
+        console.error(`创建${config.title}图层失败:`, e);
         return null;
       }
     };
@@ -646,43 +620,21 @@ export default {
       activeBasemapId.value = id;
     };
 
-    const updateLayerVisibility = async (layer) => {
-      try {
-        loadingText.value = `正在加载${layer.title}...`;
-        loading.value = true;
+    const updateLayerVisibility = async (layerItem) => {
+      const targetLayer = view.value?.map.findLayerById(layerItem.id);
 
-        const targetLayer = view.value?.map.findLayerById(layer.id);
-
-        if (targetLayer) {
-          targetLayer.visible = layer.visible;
-        } else {
-          if (layer.id === "house" && layer.visible) {
-            const houseConfig = {
-              id: "house",
-              title: "企业房屋面",
-              type: "economic",
-              url: SERVICE_URLS.economic.house,
-              defaultVisible: true
-            };
-            const newLayer = await createJsonLayer(houseConfig);
-            if (newLayer && view.value?.map) {
-              view.value.map.add(newLayer);
-              layer.loaded = true;
-            }
-          } else if (layer.id === "building") {
-            const newLayer = await createBulletinListLayer(layer);
-            if (newLayer && view.value?.map) {
-              view.value.map.add(newLayer);
-            }
+      if (targetLayer) {
+        targetLayer.visible = layerItem.visible;
+      } else {
+        if (layerItem.id === "house" && layerItem.visible) {
+          if (houseLayer.value.isFetching) {
+             console.warn("数据正在后台传输，请稍候...");
+          } else {
+             await LoadHouseLayer(view.value.map);
+             const relayer = view.value?.map.findLayerById("house");
+             if(relayer) relayer.visible = true;
           }
         }
-      } catch (error) {
-        console.error(`更新图层 ${layer.id} 可见性失败:`, error);
-        if (layer.id === "house") {
-          layer.visible = false;
-        }
-      } finally {
-        loading.value = false;
       }
     };
 
