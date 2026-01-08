@@ -47,18 +47,6 @@
               class="tree-checkbox">
             <label :for="layer.id" class="tree-label">{{ layer.title }}</label>
           </div>
-
-          <!-- <div class="tree-node tree-group"><label>文本标注</label></div>
-          <div class="tree-node">
-            <input type="checkbox" id="labelDistrict" v-model="labelVisibility.district" @change="updateLabelVisibility"
-              class="tree-checkbox">
-            <label for="labelDistrict" class="tree-label">区县名称</label>
-          </div>
-          <div class="tree-node">
-            <input type="checkbox" id="labelTown" v-model="labelVisibility.town" @change="updateLabelVisibility"
-              class="tree-checkbox">
-            <label for="labelTown" class="tree-label">街镇名称</label>
-          </div> -->
         </div>
       </div>
     </div>
@@ -219,6 +207,8 @@ export default {
           ui: { components: [] }
         });
 
+        view.value.on("click", handleMapClickQuery);
+
         // 设置弹窗 
         view.value.when(() => {
           view.value.popup.autoOpenEnabled = props.showPopup;
@@ -236,10 +226,10 @@ export default {
     // ========== 图层管理函数 ==========
     const loadAllLayers = async (map) => {
       try {
-        // 1. 加载行政区划矢量图层 
+        // 加载行政区划矢量图层 
         await loadBoundaryLayers(map);
 
-        // 2. 加载经济普查数据图层 
+        // 加载经济普查数据图层 
         await loadEconomicLayers(map);
 
         loading.value = false;
@@ -268,7 +258,7 @@ export default {
               type: "simple",
               symbol: {
                 type: "simple-fill",
-                color: [0, 0, 0, 0], // 透明填充
+                color: [0, 0, 0, 0], 
                 outline: {
                   color: config.outlineColor,
                   width: 1.5
@@ -326,7 +316,6 @@ export default {
      */
     const loadEconomicLayers = async (map) => {
       try {
-        // 只加载建筑点图层，房屋面不自动加载
         const buildingLayerInstance = await createBulletinListLayer(buildingLayer.value);
         if (buildingLayerInstance) {
           map.add(buildingLayerInstance);
@@ -409,7 +398,7 @@ export default {
     };
 
     /**
-     * 创建JSON图层（用于企业房屋面数据）
+     * 创建JSON图层
      */
     const createJsonLayer = async (config) => {
       try {
@@ -571,24 +560,23 @@ export default {
 
     const getBoundaryColor = (layerId) => {
       const colors = [
-        [34, 139, 34, 0.8],    // 市级 - 绿色
-        [70, 130, 180, 0.8],   // 区级 - 蓝色 
-        [210, 105, 30, 0.8]    // 镇街级 - 橙色
+        [34, 139, 34, 0.8],    
+        [70, 130, 180, 0.8],   
+        [210, 105, 30, 0.8]   
       ];
       return colors[layerId] || [0, 0, 0, 0.8];
     };
-
-    const setupHouseClickHandler = (houseLayerInstance) => {
+    
+    // ========== 交互处理函数 ==========
+    const handleMapClickQuery = async (event) => {
       if (!view.value || !mapModules.value) return;
 
-      // 1. 统一获取模块，避免使用容易出错的 slice 索引
       const [
         Map, MapView, FeatureLayer, Graphic, SpatialReference,
         Basemap, TileLayer, TextSymbol, LabelClass, Point,
         SimpleMarkerSymbol, SimpleFillSymbol, Query
       ] = mapModules.value;
 
-      // 清除之前高亮的辅助函数
       const clearHighlight = () => {
         if (highlightRef.value) {
           view.value.graphics.remove(highlightRef.value);
@@ -596,65 +584,52 @@ export default {
         }
       };
 
-      // 2. 监听点击事件
-      view.value.on("click", async (event) => {
-        try {
-          // 每次点击先清空旧的高亮
-          clearHighlight();
+      try {
+        // 获取点击结果
+        const hitTestResult = await view.value.hitTest(event);
+        const results = hitTestResult.results.map(r => r.graphic).filter(g => g && g.layer);
+        
+        let bestFit = null;
+        bestFit = results.find(g => g.layer.id === "house") || 
+                  results.find(g => g.layer.id === "town") || 
+                  results.find(g => g.layer.id === "district");
 
-          // 3. 射线检测：只关注房屋面图层
-          const hitTestResult = await view.value.hitTest(event);
-          const houseHit = hitTestResult.results.find(
-            (result) => result.graphic?.layer?.id === "house"
-          );
+        // 执行高亮
+        clearHighlight();
+        const highlightGraphic = new Graphic({
+          geometry: bestFit.geometry,
+          symbol: new SimpleFillSymbol({
+            color: [0, 255, 255, 0.25],
+            outline: { color: [0, 255, 255, 1], width: 2.5 }
+          })
+        });
+        view.value.graphics.add(highlightGraphic);
+        highlightRef.value = highlightGraphic;
 
-          if (!houseHit) return;
+        // 执行空间查询
+        const buildingLayer = view.value.map.findLayerById("building");
+        if (buildingLayer) {
+          const query = new Query();
+          query.geometry = bestFit.geometry;
+          query.spatialRelationship = "intersects";
+          query.outFields = ["B109"];
+          query.returnGeometry = false;
 
-          const clickedGraphic = houseHit.graphic;
+          const result = await buildingLayer.queryFeatures(query);
 
-          // 4. 创建自定义高亮 Graphic（不再依赖系统默认的黑色框）
-          const highlightGraphic = new Graphic({
-            geometry: clickedGraphic.geometry,
-            symbol: new SimpleFillSymbol({
-              color: [0, 255, 255, 0.2], // 青色透明填充
-              outline: {
-                color: [0, 255, 255, 1], // 亮青色边框
-                width: 2.5
-              }
-            })
-          });
-
-          view.value.graphics.add(highlightGraphic);
-          highlightRef.value = highlightGraphic;
-
-          // 5. 空间查询：查找该面内的企业点
-          const buildingLayer = view.value.map.findLayerById("building");
-          if (buildingLayer) {
-            const query = new Query();
-            query.geometry = clickedGraphic.geometry;
-            query.spatialRelationship = "intersects"; // 相交查询
-            query.outFields = ["B109"];
-            query.returnGeometry = false;
-
-            const result = await buildingLayer.queryFeatures(query);
-
-            if (result.features.length > 0) {
-              const codes = result.features
-                .map(f => f.attributes.B109)
-                .filter(Boolean);
-              emit('map-select', codes.join(','));
-            } else {
-              // 提示无数据
-              loadingText.value = "提示：该区域内未发现企业点";
-              loading.value = true;
-              setTimeout(() => (loading.value = false), 1500);
-              emit('map-select', 'none');
-            }
+          if (result.features.length > 0) {
+            const codes = result.features.map(f => f.attributes.B109).filter(Boolean);
+            emit('map-select', codes.join(','));
+          } else {
+            loadingText.value = "该区域内未发现企业点";
+            loading.value = true;
+            setTimeout(() => (loading.value = false), 1000);
+            emit('map-select', 'none');
           }
-        } catch (error) {
-          console.error("房屋面点击处理异常:", error);
         }
-      });
+      } catch (error) {
+        console.error("查询逻辑执行异常:", error);
+      }
     };
 
     // ========== UI交互函数 ==========
@@ -693,9 +668,6 @@ export default {
             if (newLayer && view.value?.map) {
               view.value.map.add(newLayer);
               layer.loaded = true;
-
-              // 添加房屋面点击事件监听
-              setupHouseClickHandler(newLayer);
             }
           } else if (layer.id === "building") {
             const newLayer = await createBulletinListLayer(layer);

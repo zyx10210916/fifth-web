@@ -183,6 +183,7 @@ watch(() => props.summaryData, processData, { deep: true });
 .right {
     width: 480px;
     height: 100%;
+    border-radius: 6px;
     display: flex;
     flex-direction: column;
     background-color: #fff;

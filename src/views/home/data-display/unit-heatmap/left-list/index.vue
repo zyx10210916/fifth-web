@@ -123,7 +123,7 @@ const handlePageChange = (page: number) => {
   width:100%;
   height: 100%;
   background: #ffffff;
-  border-radius: 8px;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);

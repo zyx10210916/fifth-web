@@ -79,6 +79,7 @@ onMounted(() => {
   height: 100vh; 
   width: 100%;
   gap: 10px;
+  border-radius: 6px;
   padding: 0;
   overflow: hidden;
   align-items: stretch; 

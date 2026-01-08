@@ -155,6 +155,7 @@ watch(() => props.summaryData, processData, { deep: true });
   height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: 6px;
   box-sizing: border-box;
   background-color: white;
 }

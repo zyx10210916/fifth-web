@@ -1,9 +1,20 @@
 <template>
   <div class="main-content-layout">
-    <LeftPanel class="left-list" :list-data="unitListData" :loading="listLoading" @change-page="handlePageChange"
-      @row-click="handleRowClick" />
-    <RightMap ref="mapRef" class="map-center" :selected-unit="selectedUnit" :map-points-data="mapPointsData"
-      :loading="mapLoading" />
+    <LeftPanel 
+      class="left-list"
+      :list-data="unitListData"
+      :loading="listLoading"
+      @change-page="handlePageChange"
+      @row-click="handleRowClick"
+    />
+    <RightMap 
+      ref="mapRef"
+      class="map-center"
+      :selected-unit="selectedUnit"
+      :map-points-data="mapPointsData"
+      :loading="mapLoading"
+      @map-select="handleMapClickQuery"  
+    />
   </div>
 </template>
 
@@ -28,6 +39,16 @@ const unitListData = ref({
 const mapPointsData = ref<any[]>([]);
 const listLoading = ref(false);
 const mapLoading = ref(false);
+const currentUniqueCode = ref<string | null>(null);
+
+// 处理房屋面选择事件 
+const  handleMapClickQuery  = (b109Codes: string) => {
+  currentUniqueCode.value = b109Codes === 'none' ? null : b109Codes;
+  fetchUnitList(1, {
+    ...props.filterParams,
+    uniqueCode: currentUniqueCode.value, 
+  });
+};
 
 // 左侧列表数据请求 
 const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
@@ -36,18 +57,25 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
     const params = {
       pageNo: pageNum,
       pageSize: 20,
+      "uniqueCode": currentUniqueCode.value,
       "area": "",
+      "industryDept": "",
+      "registerType": "",
+      "unitScale": "",
+      "businessOperationType": "",
+      "industryCategory": "",
+      "holdingSituation": "",
       ...extraParams
     };
-
+ 
     const res = await getUnitHeatMap(params);
-
+ 
     if (res?.data) {
       unitListData.value = {
         list: res.data.list,
         total: res.data.total,
         pageNum: pageNum,
-        pageSize: 20
+        pageSize: 20,
       };
     }
   } catch (error) {
@@ -57,11 +85,11 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
   }
 };
 
-// 右侧地图数据请求（分批加载）
+// 右侧地图数据请求
 const fetchMapPoints = async (pageNo = 1, extraParams = {}) => {
   mapLoading.value = true;
   try {
-    const pageSize = 10000;
+    const pageSize = 5000;
 
     const res = await getBulletinList({
       pageNo,
