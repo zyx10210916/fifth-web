@@ -249,6 +249,7 @@ onMounted(() => {
         flex: 1; /* 占据剩余所有空间 */
         display: flex;
         flex-direction: column;
+        padding: 0 10px;
         background: #f5f5f5;
         overflow: hidden; /* 防止内部滚动 */
         min-height: 0; /* 关键：允许flex子项收缩 */

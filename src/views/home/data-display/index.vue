@@ -1,15 +1,18 @@
 <template>
-  <div class="data-display-container">
-    <div class="tabs-head">
-      <div class="tabs-wrapper">
-        <a-tabs v-model:activeKey="activeTabKey" class="custom-tabs" @change="handleTabChange">
-          <a-tab-pane key="summary" tab="汇总数据展示" />
-          <a-tab-pane key="comparison" tab="数据比对展示" />
-          <a-tab-pane key="heatmap" tab="单位热力图" />
-          <a-tab-pane key="building" tab="建筑物展示" />
-        </a-tabs>
-      </div>
-
+  <a-tabs 
+    v-model:activeKey="activeTabKey" 
+    class="custom-tabs" 
+    @change="handleTabChange"
+  >
+    <a-tab-pane key="summary" tab="汇总数据展示" />
+    <a-tab-pane key="comparison" tab="数据比对展示" />
+    <a-tab-pane key="heatmap" tab="单位热力图" />
+    <a-tab-pane key="building" tab="建筑物展示" />
+    
+    <template #leftExtra>
+       <div style="width: 1.6rem;"></div>
+    </template>
+    <template #rightExtra>
       <div class="right-actions">
         <a-button class="filter-btn" size="small" @click="showFilterModal">
           筛选条件
@@ -18,22 +21,22 @@
           </template>
         </a-button>
       </div>
-    </div>
+    </template>
+  </a-tabs>
 
-    <div class="content">
-      <component 
-    :is="activeComponent" 
-    :filter-params="filterParams" 
-    @update-params="handleFilterApply" 
-  />
-    </div>
+  <div class="dynamic-comp">
+    <component 
+      :is="activeComponent" 
+      :filter-params="filterParams" 
+      @update-params="handleFilterApply" 
+    />
+  </div>
 
-    <FilterModal 
+  <FilterModal 
     v-model:is-visible="filterVisible"
     :current-params="filterParams"  
     @apply="handleFilterApply"
   />
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -72,129 +75,68 @@ const handleFilterApply = (filters: any) => {
 </script>
 
 <style scoped lang="less">
-.data-display-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: #f5f5f5;
-  box-sizing: border-box;
-  padding: 0 10px !important;
+.dynamic-comp {
+  height: calc(100% - 60px); 
   overflow: hidden;
+  padding: 10px 0px; 
+  background: #f5f5f5;
 }
- 
-.tabs-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 15px !important;
-  border-bottom: 1px solid #f0f0f0;
-  background: white;
-  height: 60px;
-  flex-shrink: 0;
-  border-radius: 6px;
-  position: relative;
-  padding-bottom: 2px;
-  margin-top: 15px;
-  width: 100%;
- 
-  .tabs-wrapper {
-    flex: 1;
-    margin-left: 10px;
-  }
- 
- .right-actions {
-    display: flex;
-    align-items: center;
-    gap: 1.2rem;
- 
-    .filter-btn {
-      background-color: #373737;
-      color: white;
-      border-radius: 2rem;
-      border: none;
-      font-size: 18px;
-      padding: 0 1.5rem;
-      height: 2.8rem;
-      display: flex;
-      align-items: center;
-      flex-direction: row-reverse;
- 
-      &:hover {
-        background-color: #555;
-        color: white;
-      }
- 
-      :deep(.anticon) {
-        margin-left: 0.8rem;
-        margin-right: 0;
-      }
-    }
-  }
-}
- 
+
 .custom-tabs {
   padding: 0;
-  background-color: white;
+  background-color: #fff;
+  border-bottom: 1px solid #f0f0f0;
   height: 60px;
- 
-  :deep(.ant-tabs-tab) {
-    font-size:18px;
-    padding: 1.2rem 0;
-  }
-}
- 
-:deep(.ant-tabs-nav::before) {
-  border-bottom: none !important;
-}
- 
-:deep(.ant-tabs-nav) {
-  margin-bottom: 0 !important;
-  
-  .ant-tabs-tab {
-    padding: 10px 0 !important;
-    color: rgb(113 113 113 / 100%);
-    font-size: 20px;
-    margin: 0 1.6rem;
- 
-    &.ant-tabs-tab-active {
-      .ant-tabs-tab-btn {
-        color: #546fff !important;
-      }
-    }
-  }
- 
-  .ant-tabs-ink-bar {
-    background: #546fff;
-    height: 2px !important;
-    bottom: 2px !important;
-  }
-}
- 
-.content {
-  height: calc(100%-75px);
-  width: calc(100%-15px);
-  flex: 1;
-  overflow: hidden;
-  padding: 10px 0 !important;
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-}
-
-
-.filter-btn {
-  background-color: #373737;
-  color: white;
-  border-radius: 2rem;
-  border: none;
-  height: 2.8rem;
   display: flex;
   align-items: center;
-  flex-direction: row-reverse;
+
+  :deep(.ant-tabs-nav) {
+    margin-bottom: 0 !important;
+    width: 100%;
+
+    .ant-tabs-tab {
+      padding: 12px 0 !important;
+      color: #717171;
+      font-size: 1.6rem;
+      margin: 0 1.6rem;
+
+      &.ant-tabs-tab-active .ant-tabs-tab-btn {
+        color: #546fff !important;
+        font-weight: 500;
+      }
+    }
+
+    .ant-tabs-ink-bar {
+      background: #546fff;
+      height: 2px;
+    }
+  }
 }
 
-.filter-btn:hover {
-  background-color: #555;
-  color: white;
+.right-actions {
+  padding-right: 24px;
+  display: flex;
+  align-items: center;
+
+  .filter-btn {
+    background-color: #373737;
+    color: white;
+    border-radius: 2rem;
+    border: none;
+    height: 2.8rem;
+    padding: 0 1.2rem;
+    display: flex;
+    align-items: center;
+    flex-direction: row-reverse; 
+    gap: 8px;
+
+    &:hover {
+      background-color: #555;
+    }
+  }
+}
+
+:deep(.ant-tabs-nav::before) {
+  border-bottom: none !important;
 }
 </style>

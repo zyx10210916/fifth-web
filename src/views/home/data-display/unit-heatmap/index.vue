@@ -158,7 +158,7 @@ onMounted(() => {
 <style scoped>
 .main-content-layout {
   display: flex;
-  height: 100vh;
+  height: 100%;    
   width: 100%;
   gap: 10px;
   padding: 0;
@@ -169,13 +169,20 @@ onMounted(() => {
 .left-list {
   flex: 3;
   min-width: 0;
-  overflow: auto;
+  min-height: 0; 
+  overflow: auto; 
   background: white;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-center {
   flex: 7;
   min-width: 0;
+  min-height: 0; 
   overflow: hidden;
+  background: white;
+  display: flex;
+  flex-direction: column;
 }
 </style>

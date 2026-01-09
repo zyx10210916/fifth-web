@@ -66,7 +66,7 @@ onMounted(() => {
 <style scoped>
 .main-content {
   display: flex;
-  height: 100vh; 
+  height: 100%; 
   width: 100%;
   gap: 10px;
   padding: 0;
@@ -74,8 +74,6 @@ onMounted(() => {
   align-items: stretch; 
 }
  
-.left-panel,
-.map-center,
 .right-panel {
   min-width: 0;
   overflow: auto;
