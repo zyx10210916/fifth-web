@@ -70,7 +70,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { UNIT_COLUMNS } from '../columns';
+import { UNIT_COLUMNS } from './columns';
 
 const props = defineProps<{
   listData: {

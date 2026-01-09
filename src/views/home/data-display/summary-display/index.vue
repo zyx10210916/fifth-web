@@ -8,9 +8,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import LeftPanel from './left-stats/index.vue';
-import MiddleMap from './middle-map/index.vue';
-import RightPanel from './right-stats/index.vue';
+import LeftPanel from './LeftPanel.vue';
+import MiddleMap from './MiddleMap.vue';
+import RightPanel from './RightPanel.vue';
 import { getGsSumDataDisplay } from '@/api/data-display';
 
 const props = defineProps<{

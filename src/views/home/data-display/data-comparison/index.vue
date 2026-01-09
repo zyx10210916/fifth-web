@@ -9,9 +9,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { message } from 'ant-design-vue';
-import LeftPanel from './left-stats/index.vue';
-import MiddleMap from '../summary-display/middle-map/index.vue';
-import RightPanel from './right-stats/index.vue';
+import LeftPanel from './LeftPanel.vue';
+import MiddleMap from '../summary-display/MiddleMap.vue';
+import RightPanel from './RightPanel.vue';
 import { getDataComparison } from '@/api/data-display';
 
 const props = defineProps<{

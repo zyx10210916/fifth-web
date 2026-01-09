@@ -65,7 +65,7 @@
 import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw, watch } from 'vue';
 import { loadModules } from 'esri-loader';
 import { MAP_CONFIG } from '@/config/mapConfig';
-import MapTools from '@/views/home/data-display/summary-display/middle-map/MapTools.vue';
+import MapTools from '@/views/home/data-display/summary-display/MapTools.vue';
 
 export default {
   name: 'ArcGISHeatmapPro',

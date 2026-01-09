@@ -20,8 +20,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
-import LeftPanel from './left-list/index.vue';
-import RightMap from './right-map/index.vue';
+import LeftPanel from './LeftPanel.vue';
+import RightMap from './RightMap.vue';
 import { getUnitHeatMap, getBulletinList } from '@/api/data-display';
 
 const props = defineProps<{

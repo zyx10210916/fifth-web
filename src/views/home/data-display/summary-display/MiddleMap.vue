@@ -285,8 +285,8 @@ export default {
         });
 
         // 3. 分批加载数据 
-        const batchSize = 2000;
-        const totalCount = 2000; // 如果是动态的，建议从第一次请求的 res.data.total 获取
+        const batchSize = 5000;
+        const totalCount = 5000; 
         const batchCount = Math.ceil(totalCount / batchSize);
 
         for (let i = 1; i <= batchCount; i++) {
@@ -316,7 +316,6 @@ export default {
                   spatialReference: { wkid: 4526 }
                 },
                 attributes: {
-                  // 确保全局唯一 ID，从 1 开始
                   ObjectId: (i - 1) * batchSize + index + 1,
                   B109: item.B109 || "",
                   ZYSR: item.ZYSR || "",
