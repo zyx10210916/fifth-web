@@ -89,7 +89,7 @@ const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
 const fetchMapPoints = async (pageNo = 1, extraParams = {}) => {
   mapLoading.value = true;
   try {
-    const pageSize = 5000;
+    const pageSize = 2000;
 
     const res = await getBulletinList({
       pageNo,

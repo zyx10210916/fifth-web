@@ -31,8 +31,8 @@
             <label for="building" class="tree-label">企业建筑点</label>
           </div>
           <div v-if="houseLayer.loaded" class="tree-node">
-            <input type="checkbox" id="house" v-model="houseLayer.visible" 
-              @change="updateLayerVisibility(houseLayer)" class="tree-checkbox">
+            <input type="checkbox" id="house" v-model="houseLayer.visible" @change="updateLayerVisibility(houseLayer)"
+              class="tree-checkbox">
             <label for="house" class="tree-label">企业房屋面</label>
           </div>
 
@@ -57,61 +57,15 @@
 import { ref, shallowRef, onMounted, onUnmounted, computed, watch, markRaw } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapTools from './MapTools.vue';
+import { MAP_CONFIG } from '@/config/mapConfig';
 import { getBulletinList } from '@/api/data-display';
-import dtNormal from "@/assets/images/dt-1.png";
-import dtActive from "@/assets/images/dt-2.png";
-import yxtNormal from "@/assets/images/yxt-1.png";
-import yxtActive from "@/assets/images/yxt-2.png";
-
-// 集中管理所有服务URL 
-const SERVICE_URLS = {
-  // 底图服务 
-  basemaps: {
-    street: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/0dd2d428919f40818617fdf05492aaff/DataServer",
-    satellite: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/1e8f0689c7f84b3581bf98449ed8e700/DataServer"
-  },
-
-  // 行政区划矢量数据服务
-  boundary: {
-    vector: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/2baabbc53f404e7a96f9f9da3ec0ec68/DataServer",
-    layers: {
-      district: {
-        layerId: 2,
-        title: "区县行政边界",
-        defaultVisible: true,
-        labelSize: "14px",
-        labelColor: "#222",
-        outlineColor: [70, 130, 180, 0.8]
-      },
-      town: {
-        layerId: 3,
-        title: "街镇行政边界",
-        defaultVisible: false,
-        labelSize: "12px",
-        labelColor: "#444",
-        outlineColor: [210, 105, 30, 0.8]
-      }
-    }
-  },
-
-  // 经济普查数据服务 
-  economic: {
-    house: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&outputFormat=application%2Fjson"
-  },
-
-  // ArcGIS API配置 
-  arcgisApi: {
-    js: "http://10.44.58.28:8000/4.19/init.js",
-    css: "http://10.44.58.28:8000/4.19/esri/themes/light/main.css"
-  }
-};
 
 export default {
   name: 'ArcGISFeatureLayerJsonMix',
   components: { MapTools },
   props: {
     isFullSize: { type: Boolean, default: false },
-    showPopup: { type: Boolean, default: false },
+    showPopup: { type: Boolean, default: true },
     filterParams: { type: Object, default: () => ({}) }
   },
 
@@ -120,6 +74,7 @@ export default {
     const view = shallowRef(null);
     const panelVisible = ref(true);
     const activeBasemapId = ref('street');
+    const mapList = MAP_CONFIG.basemapUI;
     const basemapVisible = ref(true);
     const mapModules = shallowRef(null);
     const loading = ref(true);
@@ -141,8 +96,8 @@ export default {
       title: "企业房屋面",
       visible: false,
       type: "economic",
-      isFetching: false, 
-      loaded: false      
+      isFetching: false,
+      loaded: false
     });
 
     const labelVisibility = ref({
@@ -150,12 +105,6 @@ export default {
       town: false,
       village: false
     });
-
-    // ========== 地图配置 ==========
-    const mapList = [
-      { id: 'street', name: '地图', className: 'mapType-normal', imgNormal: dtNormal, imgActive: dtActive },
-      { id: 'satellite', name: '影像图', className: 'mapType-image', imgNormal: yxtNormal, imgActive: yxtActive }
-    ];
 
     // ========== 计算属性 ==========
     const economicLayers = computed(() => layers.value.filter(l => l.type === "economic"));
@@ -169,10 +118,10 @@ export default {
           'esri/Graphic', 'esri/geometry/SpatialReference', 'esri/Basemap',
           'esri/layers/TileLayer', 'esri/symbols/TextSymbol', 'esri/layers/support/LabelClass',
           'esri/geometry/Point', 'esri/symbols/SimpleMarkerSymbol', 'esri/symbols/SimpleFillSymbol',
-          'esri/tasks/support/Query',
+          'esri/tasks/support/Query', 'esri/Graphic'
         ], {
-          url: SERVICE_URLS.arcgisApi.js,
-          css: SERVICE_URLS.arcgisApi.css
+          url: MAP_CONFIG.arcgis.js,
+          css: MAP_CONFIG.arcgis.css
         });
 
         mapModules.value = modules;
@@ -180,15 +129,12 @@ export default {
 
         // 创建默认底图 
         const defaultBasemap = new Basemap({
-          baseLayers: [new TileLayer({ url: SERVICE_URLS.basemaps.street })],
+          baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
           id: "street"
         });
 
         // 创建地图实例 
-        const map = new Map({
-          basemap: defaultBasemap,
-          layers: []
-        });
+        const map = new Map({ basemap: defaultBasemap, layers: [] });
 
         // 设置空间参考
         const sr = new SpatialReference({ wkid: 4526 });
@@ -198,13 +144,7 @@ export default {
           container: "viewDiv",
           map: map,
           spatialReference: sr,
-          extent: {
-            xmin: 38392997.07,
-            ymin: 2495903.35,
-            xmax: 38505644.28,
-            ymax: 2648163.20,
-            spatialReference: sr
-          },
+          extent: MAP_CONFIG.initialExtent,
           ui: { components: [] }
         });
 
@@ -218,7 +158,7 @@ export default {
         // 加载图层
         await loadBoundaryLayers(map);
         await loadBuildingPoints(map);
-        loading.value = false; 
+        loading.value = false;
         LoadHouseLayer(map);
 
       } catch (error) {
@@ -236,9 +176,9 @@ export default {
         const [FeatureLayer, TextSymbol] = mapModules.value.slice(2, 4);
 
         // 加载所有行政区划图层
-        for (const [key, config] of Object.entries(SERVICE_URLS.boundary.layers)) {
+        for (const [key, config] of Object.entries(MAP_CONFIG.boundary.layers)) {
           const layer = new FeatureLayer({
-            url: `${SERVICE_URLS.boundary.vector}/${config.layerId}`,
+            url: `${MAP_CONFIG.boundary.baseUrl}/${config.layerId}`,
             id: key,
             title: config.title,
             outFields: ["*"],
@@ -247,7 +187,7 @@ export default {
               type: "simple",
               symbol: {
                 type: "simple-fill",
-                color: [0, 0, 0, 0], 
+                color: [0, 0, 0, 0],
                 outline: {
                   color: config.outlineColor,
                   width: 1.5
@@ -303,85 +243,20 @@ export default {
 
     // 加载建筑点
     const loadBuildingPoints = async (map) => {
-      const instance = await createBulletinListLayer(buildingLayer.value);
-      if (instance) {
-        map.add(instance);
-        layers.value.push({ 
-          ...buildingLayer.value, 
-          instance: markRaw(instance) 
-        });
-      }
-    };
 
-    // 加载房屋面
-    const LoadHouseLayer = async (map) => {
-    if (houseLayer.value.loaded || houseLayer.value.isFetching) return;
-    
-    houseLayer.value.isFetching = true;
-    try {
-      const houseConfig = {
-        id: "house",
-        title: "企业房屋面",
-        type: "economic",
-        url: SERVICE_URLS.economic.house,
-        defaultVisible: false 
-      };
+      const [FeatureLayer, Graphic] = mapModules.value.slice(2, 4);
 
-      const newLayer = await createJsonLayer(houseConfig);
-      
-      if (newLayer) {
-        map.add(newLayer);
-        houseLayer.value.loaded = true;
-      }
-    } catch (e) {
-      console.error("房屋面异步加载失败:", e);
-    } finally {
-      houseLayer.value.isFetching = false;
-    }
-  };
+      loading.value = true;
 
-    /**
-     * 从getBulletinList接口创建企业点图层 
-     */
-    const createBulletinListLayer = async (config) => {
       try {
-        loadingText.value = `正在加载${config.title}...`;
-        const res = await getBulletinList({ pageNo: 1, pageSize: 5000, ...props.filterParams });
-
-        if (!res?.data?.list) return null;
-
-        const [Map, MapView, FeatureLayer, Graphic] = mapModules.value;
-
-        const validGraphics = res.data.list
-          .map((item, index) => {
-            const x = parseFloat(item.XZ_AXIS);
-            const y = parseFloat(item.YZ_AXIS);
-            if (isNaN(x) || isNaN(y)) return null;
-
-            return new Graphic({
-              geometry: {
-                type: "point",
-                x: x,
-                y: y,
-                spatialReference: { wkid: 4526 }
-              },
-              attributes: {
-                ObjectId: index,
-                B109: item.B109,
-                ZYSR: item.ZYSR,
-                ZCZJ: item.ZCZJ,
-                QMRS: item.QMRS,
-                CYRS: item.CYRS
-              }
-            });
-          })
-          .filter(g => g !== null);
-
+        // 1. 创建空图层 (Client-side FeatureLayer)
         const layer = new FeatureLayer({
-          source: validGraphics,
-          id: config.id,
-          title: config.title,
+          id: "building",
+          title: "企业建筑点",
           objectIdField: "ObjectId",
+          geometryType: "point", // 必须指定几何类型
+          source: [],           // 必须初始化为空数组
+          spatialReference: { wkid: 4526 }, // 必须指定坐标系
           fields: [
             { name: "ObjectId", type: "oid" },
             { name: "B109", type: "string" },
@@ -399,14 +274,99 @@ export default {
               outline: { color: [255, 255, 255], width: 1 }
             }
           },
-          spatialReference: { wkid: 4526 },
-          visible: config.visible,
-          popupTemplate: createPopupTemplate(config)
+          popupTemplate: createPopupTemplate(buildingLayer.value)
         });
-        return layer;
+
+        // 2. 将图层添加到地图和 Vue 状态中
+        map.add(layer);
+        layers.value.push({
+          ...buildingLayer.value,
+          instance: markRaw(layer)
+        });
+
+        // 3. 分批加载数据 
+        const batchSize = 2000;
+        const totalCount = 2000; // 如果是动态的，建议从第一次请求的 res.data.total 获取
+        const batchCount = Math.ceil(totalCount / batchSize);
+
+        for (let i = 1; i <= batchCount; i++) {
+          loadingText.value = `正在加载企业建筑点数据 (${i}/${batchCount})...`;
+
+          const res = await getBulletinList({
+            pageNo: i,
+            pageSize: batchSize,
+            ...props.filterParams
+          });
+
+          if (!res?.data?.list || res.data.list.length === 0) continue;
+
+          // 4. 将原始数据转换为 Graphic 数组
+          const graphics = res.data.list
+            .map((item, index) => {
+              const x = parseFloat(item.XZ_AXIS);
+              const y = parseFloat(item.YZ_AXIS);
+
+              if (isNaN(x) || isNaN(y)) return null;
+
+              return new Graphic({
+                geometry: {
+                  type: "point",
+                  x: x,
+                  y: y,
+                  spatialReference: { wkid: 4526 }
+                },
+                attributes: {
+                  // 确保全局唯一 ID，从 1 开始
+                  ObjectId: (i - 1) * batchSize + index + 1,
+                  B109: item.B109 || "",
+                  ZYSR: item.ZYSR || "",
+                  ZCZJ: item.ZCZJ || "",
+                  QMRS: item.QMRS || "",
+                  CYRS: item.CYRS || ""
+                }
+              });
+            })
+            .filter(g => g !== null);
+
+          // 5. 使用 applyEdits 批量添加图形
+          if (graphics.length > 0) {
+            await layer.applyEdits({
+              addFeatures: graphics
+            });
+          }
+        }
+      } catch (error) {
+        console.error("加载企业建筑点失败:", error);
+      } finally {
+        loading.value = false;
+        loadingText.value = "";
+      }
+    };
+
+    // 加载房屋面
+    const LoadHouseLayer = async (map) => {
+      if (houseLayer.value.loaded || houseLayer.value.isFetching) return;
+
+      houseLayer.value.isFetching = true;
+      try {
+        const houseConfig = {
+          id: "house",
+          title: "企业房屋面",
+          type: "economic",
+          url: MAP_CONFIG.economic.houseUrl,
+          defaultVisible: false
+        };
+
+        const newLayer = await createJsonLayer(houseConfig);
+
+        if (newLayer) {
+          map.add(newLayer);
+          houseLayer.value.loaded = true;
+        }
       } catch (e) {
-        console.error("创建图层失败:", e);
-        return null;
+        console.error("房屋面异步加载失败:", e);
+      } finally {
+        houseLayer.value.isFetching = false;
       }
     };
 
@@ -419,7 +379,7 @@ export default {
         const data = await res.json();
         if (!data.features || data.features.length === 0) return null;
 
-        const [,,, Graphic,,,,, SimpleFillSymbol] = mapModules.value;
+        const [, , , Graphic, , , , , SimpleFillSymbol] = mapModules.value;
         const FeatureLayer = mapModules.value[2];
 
         const graphics = data.features.map((f, index) => {
@@ -534,13 +494,13 @@ export default {
 
     const getBoundaryColor = (layerId) => {
       const colors = [
-        [34, 139, 34, 0.8],    
-        [70, 130, 180, 0.8],   
-        [210, 105, 30, 0.8]   
+        [34, 139, 34, 0.8],
+        [70, 130, 180, 0.8],
+        [210, 105, 30, 0.8]
       ];
       return colors[layerId] || [0, 0, 0, 0.8];
     };
-    
+
     // ========== 交互处理函数 ==========
     const handleMapClickQuery = async (event) => {
       if (!view.value || !mapModules.value) return;
@@ -562,11 +522,11 @@ export default {
         // 获取点击结果
         const hitTestResult = await view.value.hitTest(event);
         const results = hitTestResult.results.map(r => r.graphic).filter(g => g && g.layer);
-        
+
         let bestFit = null;
-        bestFit = results.find(g => g.layer.id === "house") || 
-                  results.find(g => g.layer.id === "town") || 
-                  results.find(g => g.layer.id === "district");
+        bestFit = results.find(g => g.layer.id === "house") ||
+          results.find(g => g.layer.id === "town") ||
+          results.find(g => g.layer.id === "district");
 
         // 执行高亮
         clearHighlight();
@@ -611,7 +571,7 @@ export default {
       if (activeBasemapId.value === id || !view.value || !mapModules.value) return;
 
       const [Basemap, TileLayer] = mapModules.value.slice(5, 7);
-      const url = SERVICE_URLS.basemaps[id];
+      const url = MAP_CONFIG.basemaps[id];
 
       view.value.map.basemap = new Basemap({
         baseLayers: [new TileLayer({ url })],
@@ -628,11 +588,11 @@ export default {
       } else {
         if (layerItem.id === "house" && layerItem.visible) {
           if (houseLayer.value.isFetching) {
-             console.warn("数据正在后台传输，请稍候...");
+            console.warn("数据正在后台传输，请稍候...");
           } else {
-             await LoadHouseLayer(view.value.map);
-             const relayer = view.value?.map.findLayerById("house");
-             if(relayer) relayer.visible = true;
+            await LoadHouseLayer(view.value.map);
+            const relayer = view.value?.map.findLayerById("house");
+            if (relayer) relayer.visible = true;
           }
         }
       }
