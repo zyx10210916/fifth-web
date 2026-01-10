@@ -65,7 +65,7 @@
 import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw, watch } from 'vue';
 import { loadModules } from 'esri-loader';
 import { MAP_CONFIG } from '@/config/mapConfig';
-import MapTools from '@/views/home/data-display/summary-display/MapTools.vue';
+import MapTools from '../summary-display/MapTools.vue';
 
 export default {
   name: 'ArcGISHeatmapPro',
@@ -85,10 +85,12 @@ export default {
     const loadingText = ref('正在加载地图...');
     const layers = ref([]);
     const activeBasemapId = ref('street');
-    const basemapVisible = ref(true); // 控制底图显示隐藏
+    const basemapVisible = ref(true);
     const mapList = MAP_CONFIG.basemapUI;
     const selectedHeatmapField = ref("");
     const mapToolsRef = ref(null);
+    const highlightGraphic = shallowRef(null); 
+    const highlightRef = shallowRef(null); 
 
     const fieldOptions = ref([
       { value: "QMRS", label: "期末人数", type: "Long" },
@@ -98,8 +100,8 @@ export default {
     ]);
 
     // 分类图层
-    const businessLayers = computed(() => layers.value.filter(l => !['district', 'town', 'village'].includes(l.id)));
-    const boundaryLayers = computed(() => layers.value.filter(l => ['district', 'town', 'village'].includes(l.id)));
+    const businessLayers = computed(() => layers.value.filter(l => !['district', 'town'].includes(l.id)));
+    const boundaryLayers = computed(() => layers.value.filter(l => ['district', 'town'].includes(l.id)));
 
     const currentFieldLabel = computed(() => {
       if (!selectedHeatmapField.value) return "仅按分布密度";
@@ -141,6 +143,7 @@ export default {
           await createHeatmap(map);
           await loadBoundaryLayers(map);
           await loadHouseLayer(map);
+          view.value.on("click", handleMapClickQuery);
           loading.value = false;
         });
 
@@ -180,8 +183,6 @@ export default {
       activeBasemapId.value = id;
     };
 
-    // 加载各业务图层方法 (loadBoundaryLayers, loadHouseLayer, loadBuildingPoints, createHeatmap)
-    // 此处保持你原有逻辑，但在 push 到 layers 时确保结构一致
     const loadBoundaryLayers = async (map) => {
       const [FeatureLayer] = mapModules.value;
       for (const [key, conf] of Object.entries(MAP_CONFIG.boundary.layers)) {
@@ -269,7 +270,146 @@ export default {
       if (newLayer) newLayer.visible = currentVisible;
     };
 
+ const handleMapClickQuery = async (event) => {
+  if (!view.value || !mapModules.value) return;
+  
+  const [Graphic, Query, SimpleFillSymbol] = mapModules.value;
+ 
+  // 1. 清除之前的高亮（使用更清晰的函数封装）
+  const clearHighlight = () => {
+    if (highlightRef.value) {
+      view.value.graphics.remove(highlightRef.value);
+      highlightRef.value = null;
+    }
+  };
+  clearHighlight();
+ 
+  try {
+    const hitTest = await view.value.hitTest(event);
+    
+    const priorityIds = ["enterprise_house", "town", "district"];
+    let bestFit = null;
+ 
+    // 2. 查找点击的图层，增加可见性判断
+    for (const id of priorityIds) {
+      const layerState = layers.value.find(l => l.id === id);
+      if (layerState && layerState.visible) {
+        const hit = hitTest.results.find(r => r.graphic?.layer?.id === id);
+        if (hit) {
+          bestFit = hit.graphic;
+          break;
+        }
+      }
+    }
+ 
+    if (!bestFit) {
+      emit('map-select', ''); 
+      return;
+    }
+ 
+    // 3. 改进后的高亮效果（保持原有样式但代码结构更清晰）
+    const highlightGraphic = new Graphic({
+      geometry: bestFit.geometry,
+      symbol: new SimpleFillSymbol({
+        color: [0, 255, 255, 0.25],  // 半透明青色填充 
+        outline: { 
+          color: [0, 255, 255, 1],   // 实线青色边框
+          width: 2.5                 // 边框宽度 
+        }
+      })
+    });
+    
+    view.value.graphics.add(highlightGraphic);
+    highlightRef.value = highlightGraphic;
+ 
+    // 4. 查询该区域内的企业点 
+    const buildingLayer = view.value.map.findLayerById("building");
+    if (buildingLayer) {
+      const query = buildingLayer.createQuery();
+      query.geometry = bestFit.geometry;
+      query.spatialRelationship = "intersects";
+      query.outFields = ["B109"];
+      query.returnGeometry = false;
+ 
+      const result = await buildingLayer.queryFeatures(query);
+      
+      // 5. 提取并过滤 B109
+      const b109Codes = result.features
+        .map(f => f.attributes.B109)
+        .filter(code => code && code !== 'null')
+        .join(',');
+      
+      if (b109Codes) {
+        emit('map-select', b109Codes);
+      } else {
+        loadingText.value = "该区域内未发现企业点";
+        loading.value = true;
+        setTimeout(() => (loading.value = false), 1000);
+        emit('map-select', 'none');
+      }
+    }
+  } catch (err) {
+    console.error("查询失败:", err);
+  }
+};
+
     const handleMapSelection = (codes) => emit('map-select', codes);
+
+    const highlightAndLocateUnit = async (unit) => {
+      if (!unit?.B109 || !view.value) return;
+      
+      const [Graphic] = mapModules.value;
+    
+      // 清除之前的高亮 
+      if (highlightGraphic.value) {
+        view.value.graphics.remove(highlightGraphic.value);
+      }
+    
+      try {
+        const buildingLayer = view.value.map.findLayerById("building");
+        if (!buildingLayer) return;
+    
+        // 查询指定单位
+        const query = buildingLayer.createQuery();
+        query.where = `B109 = '${unit.B109}'`;
+        query.returnGeometry = true;
+    
+        const { features } = await buildingLayer.queryFeatures(query);
+    
+        if (features[0]?.geometry) {
+          // 添加高亮效果 
+          highlightGraphic.value = new Graphic({
+            geometry: features[0].geometry,
+            symbol: {
+              type: "simple-marker",
+              color: [255, 0, 0],
+              outline: { color: [255, 255, 255], width: 2 },
+              size: 12 
+            }
+          });
+          view.value.graphics.add(highlightGraphic.value);
+          
+          // 定位到该单位 
+          await view.value.goTo({
+            target: features[0].geometry,
+            zoom: 10 
+          });
+    
+          // 显示弹出窗口 
+          view.value.popup.open({
+            title: unit.B102 || '单位信息',
+            content: `统一代码: ${unit.B109}`,
+            location: features[0].geometry
+          });
+        }
+      } catch (error) {
+        console.error("定位失败:", error);
+      }
+    };
+
+    watch(() => props.selectedUnit, (newUnit) => {
+      highlightAndLocateUnit(newUnit);
+    });
 
     onMounted(initializeMap);
     onUnmounted(() => view.value?.destroy());
@@ -280,7 +420,7 @@ export default {
       mapList, activeBasemapId, basemapVisible,
       fieldOptions, selectedHeatmapField, currentFieldLabel,
       updateLayerVisibility, updateBasemapVisibility,
-      handleBasemapChange, handleFieldChange, handleMapSelection,
+      handleBasemapChange, handleFieldChange, handleMapSelection, highlightAndLocateUnit,
       togglePanel: () => panelVisible.value = !panelVisible.value,
       mapToolsRef
     };

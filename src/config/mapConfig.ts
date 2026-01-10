@@ -62,7 +62,7 @@ export const MAP_CONFIG = {
 
   // GeoJSON/WFS 服务配置
   economic: {
-    houseUrl: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&maxFeatures=50&outputFormat=application%2Fjson"
+    houseUrl: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&outputFormat=application%2Fjson"
   },
 
   // 图层样式配置
