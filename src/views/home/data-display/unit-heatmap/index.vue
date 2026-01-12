@@ -42,8 +42,8 @@ const mapLoading = ref(false);
 const currentUniqueCode = ref<string | null>(null);
 
 // 处理房屋面选择事件 
-const  handleMapClickQuery  = (b109Codes: string) => {
-  currentUniqueCode.value = b109Codes === 'none' ? null : b109Codes;
+const  handleMapClickQuery  = (Codes: string) => {
+  currentUniqueCode.value = Codes === 'none' ? null : Codes;
   fetchUnitList(1, {
     ...props.filterParams,
     uniqueCode: currentUniqueCode.value, 

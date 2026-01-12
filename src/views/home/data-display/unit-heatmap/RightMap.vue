@@ -334,13 +334,13 @@ export default {
       const result = await buildingLayer.queryFeatures(query);
       
       // 5. 提取并过滤 B109
-      const b109Codes = result.features
+      const Codes = result.features
         .map(f => f.attributes.B109)
         .filter(code => code && code !== 'null')
         .join(',');
       
-      if (b109Codes) {
-        emit('map-select', b109Codes);
+      if (Codes) {
+        emit('map-select', Codes);
       } else {
         loadingText.value = "该区域内未发现企业点";
         loading.value = true;
