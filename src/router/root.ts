@@ -40,4 +40,13 @@ export default [
       },
     ],
   },
+    {
+    path: '/heatmap-view',
+    name: 'HeatmapViewPage',
+    meta: { 
+      title: '热力图展示',
+      fullScreen: true 
+    },
+    component: () => import('@/views/home/data-display/unit-heatmap/HeatmapView.vue'),
+  }
 ];
