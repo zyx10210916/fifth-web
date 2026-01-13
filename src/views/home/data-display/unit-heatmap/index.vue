@@ -11,7 +11,7 @@
       ref="mapRef"
       class="map-center"
       :selected-unit="selectedUnit"
-      :map-points-data="mapPointsData"
+      :filter-params="effectiveFilterParams"
       :loading="mapLoading"
       @map-select="handleMapClickQuery"  
     />
@@ -19,16 +19,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import LeftPanel from './LeftPanel.vue';
 import RightMap from './RightMap.vue';
-import { getUnitHeatMap, getBulletinList } from '@/api/data-display';
+import { getUnitHeatMap } from '@/api/data-display';
 
 const props = defineProps<{
   filterParams?: any;
 }>();
 
-const mapRef = ref();
 const selectedUnit = ref<any>(null);
 const unitListData = ref({
   list: [],
@@ -36,122 +35,64 @@ const unitListData = ref({
   pageNum: 1,
   pageSize: 20
 });
-const mapPointsData = ref<any[]>([]);
+
 const listLoading = ref(false);
 const mapLoading = ref(false);
 const currentUniqueCode = ref<string | null>(null);
 
-// 处理房屋面选择事件 
-const  handleMapClickQuery  = (Codes: string) => {
-  currentUniqueCode.value = Codes === 'none' ? null : Codes;
-  fetchUnitList(1, {
-    ...props.filterParams,
-    uniqueCode: currentUniqueCode.value, 
-  });
+const effectiveFilterParams = computed(() => ({
+  ...props.filterParams,
+  uniqueCode: currentUniqueCode.value 
+}));
+
+const handleMapClickQuery = (codes: string) => {
+  currentUniqueCode.value = codes === 'none' ? null : codes;
+  fetchUnitList(1);
 };
 
-// 左侧列表数据请求 
-const fetchUnitList = async (pageNum = 1, extraParams = {}) => {
+const fetchUnitList = async (pageNum = 1) => {
   listLoading.value = true;
   try {
-    const params = {
+    const res = await getUnitHeatMap({
       pageNo: pageNum,
       pageSize: 20,
-      "uniqueCode": currentUniqueCode.value,
-      "area": "",
-      "industryDept": "",
-      "registerType": "",
-      "unitScale": "",
-      "businessOperationType": "",
-      "industryCategory": "",
-      "holdingSituation": "",
-      ...extraParams
-    };
- 
-    const res = await getUnitHeatMap(params);
- 
+      ...effectiveFilterParams.value
+    });
+
     if (res?.data) {
       unitListData.value = {
-        list: res.data.list,
-        total: res.data.total,
+        list: res.data.list || [],
+        total: res.data.total || 0,
         pageNum: pageNum,
         pageSize: 20,
       };
     }
   } catch (error) {
-    console.error('获取单位热力图列表失败:', error);
+    console.error('获取单位列表失败:', error);
   } finally {
     listLoading.value = false;
   }
 };
 
-// 右侧地图数据请求
-const fetchMapPoints = async (pageNo = 1, extraParams = {}) => {
-  mapLoading.value = true;
-  try {
-    const pageSize = 2000;
-
-    const res = await getBulletinList({
-      pageNo,
-      pageSize,
-      "area": "",
-      ...extraParams
-    });
-
-    if (res?.data?.list && res.data.list.length > 0) {
-      // 转换数据格式
-      const transformedPoints = res.data.list.map(item => ({
-        ...item,
-        XZ_AXIS: item.XZ_AXIS,
-        YZ_AXIS: item.YZ_AXIS,
-        B109: item.B109,
-        WYM: item.WYM,
-        ZCZJ: item.ZCZJ,
-        ZYSR: item.ZYSR,
-        QMRS: item.QMRS,
-        CYRS: item.CYRS
-      }));
-
-      // 追加新数据到现有数据 
-      mapPointsData.value = [...mapPointsData.value, ...transformedPoints];
-
-      // // 检查是否还有更多数据可以加载
-      // if (res.data.list.length === pageSize && pageNo * pageSize < res.data.total) {
-      //   // 继续加载下一页
-      //   fetchMapPoints(pageNo + 1, extraParams);
-      // }
-    }
-  } catch (error) {
-    console.error('获取地图点位数据失败:', error);
-  } finally {
-    mapLoading.value = false;
-  }
-};
-
 const handleRowClick = (row: any) => {
+  // 只需要更新响应式变量，RightMap 内部的 watch 会感知并触发高亮
   selectedUnit.value = {
     WYM: row.WYM,
     B102: row.B102,
-    B109: row.B109
+    B109: row.B109 
   };
-  if (mapRef.value) {
-    mapRef.value.highlightUnit(selectedUnit.value);
-  }
 };
 
 const handlePageChange = (page: number) => {
-  fetchUnitList(page, props.filterParams || {});
+  fetchUnitList(page);
 };
 
-watch(() => props.filterParams, (newVal) => {
-  fetchUnitList(1, newVal || {});
-  mapPointsData.value = []; 
-  fetchMapPoints(1, newVal || {});
+watch(() => props.filterParams, () => {
+  fetchUnitList(1);
 }, { deep: true });
 
 onMounted(() => {
-  fetchUnitList(1, props.filterParams || {});
-  fetchMapPoints(1, props.filterParams || {});
+  fetchUnitList(1);
 });
 </script>
 
@@ -161,28 +102,19 @@ onMounted(() => {
   height: 100%;    
   width: 100%;
   gap: 10px;
-  padding: 0;
-  overflow: hidden;
-  align-items: stretch;
+  background: #f0f2f5;
 }
 
 .left-list {
   flex: 3;
-  min-width: 0;
-  min-height: 0; 
-  overflow: auto; 
   background: white;
-  display: flex;
-  flex-direction: column;
+  border-radius: 4px;
 }
 
 .map-center {
   flex: 7;
-  min-width: 0;
-  min-height: 0; 
-  overflow: hidden;
   background: white;
-  display: flex;
-  flex-direction: column;
+  border-radius: 4px;
+  position: relative;
 }
 </style>
