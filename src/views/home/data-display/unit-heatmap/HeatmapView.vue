@@ -1,6 +1,7 @@
 <template>
   <div class="heatmap-container">
     <div id="heatmapViewDiv" style="width: 100%; height: 100vh; position: relative;">
+
       <div v-if="loading" class="loading-overlay">
         <div class="loading-content">
           <div class="spinner"></div>
@@ -27,25 +28,36 @@
 </template>
 
 <script>
-import { ref, shallowRef, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { loadModules } from 'esri-loader';
-import { MAP_CONFIG } from '@/config/mapConfig';
+
+// OpenLayers 核心组件
+import 'ol/ol.css';
+import Map from 'ol/Map';
+import View from 'ol/View';
+import { Heatmap as HeatmapLayer, VectorTile as VectorTileLayer } from 'ol/layer';
+import VectorSource from 'ol/source/Vector';
+import VectorTileSource from 'ol/source/VectorTile';
+import MVT from 'ol/format/MVT';
+import TileGrid from 'ol/tilegrid/TileGrid';
+import { get as getProjection } from 'ol/proj';
+import { getTopLeft, getWidth } from 'ol/extent';
 
 export default {
-  name: 'HeatmapView',
+  name: 'VectorTileHeatmapView',
   setup() {
     const router = useRouter();
-    const view = shallowRef(null);
+    const mapInstance = ref(null);
+    const heatmapLayer = ref(null);
     const loading = ref(true);
-    const loadingText = ref('正在加载热力图...');
+    const loadingText = ref('正在加载矢量热力数据...');
+
     const selectedHeatmapField = ref("");
-    
     const fieldOptions = ref([
-      { value: "QMRS", label: "期末人数", type: "Long" },
-      { value: "ZCZJ", label: "资产总计", type: "Double" },
-      { value: "ZYSR", label: "主营收入", type: "Double" },
-      { value: "CYRS", label: "从业人数", type: "Double" }
+      { value: "QMRS", label: "期末人数" },
+      { value: "ZCZJ", label: "资产总计" },
+      { value: "ZYSR", label: "主营收入" },
+      { value: "CYRS", label: "从业人数" }
     ]);
 
     const currentFieldLabel = computed(() => {
@@ -54,134 +66,131 @@ export default {
       return field ? field.label : "未知字段";
     });
 
-    const initializeMap = async () => {
-      try {
-        // 从sessionStorage获取数据
-        const mapPointsData = JSON.parse(sessionStorage.getItem('heatmapData') || '[]');
-        
-        const [FeatureLayer, Graphic, Map, MapView, SpatialReference] = await loadModules([
-          'esri/layers/FeatureLayer', 'esri/Graphic', 'esri/Map', 'esri/views/MapView', 'esri/geometry/SpatialReference'
-        ], {
-          url: MAP_CONFIG.arcgis.js,
-          css: MAP_CONFIG.arcgis.css
-        });
+    // GeoServer 矢量切片服务地址
+    const vtUrl = "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/gwc/demo/dataCenterWorkspace:gongbaokuqiyedianpc38_1?gridSet=EPSG:4326&format=application/vnd.mapbox-vector-tile&tile={z}&x={x}&y={y}";
 
-        // 创建点图形
-        const graphics = mapPointsData.map((item, index) => new Graphic({
-          geometry: { 
-            type: "point", 
-            x: item.XZ_AXIS, 
-            y: item.YZ_AXIS, 
-            spatialReference: new SpatialReference({ wkid: 4526 }) 
-          },
-          attributes: { ...item, custom_oid: index }
-        }));
+    const initMap = () => {
+      const projection = getProjection('EPSG:4326');
+      const projectionExtent = projection.getExtent(); // [-180, -90, 180, 90]
 
-        // 创建热力图图层
-        const heatmapLayer = new FeatureLayer({
-          id: "heatmap_layer",
-          title: "企业热力图",
-          source: graphics,
-          objectIdField: "custom_oid",
-          renderer: createHeatmapRenderer(selectedHeatmapField.value),
-          visible: true
-        });
-
-        const map = new Map({
-          basemap: "streets",
-          layers: [heatmapLayer]
-        });
-
-        view.value = new MapView({
-          container: "heatmapViewDiv",
-          map: map,
-          spatialReference: new SpatialReference({ wkid: 4526 }),
-          extent: MAP_CONFIG.initialExtent,
-          ui: { components: [] }
-        });
-
-        view.value.when(() => {
-          loading.value = false;
-        });
-
-      } catch (error) {
-        console.error("热力图初始化失败:", error);
-        loading.value = false;
+      // 1. 核心修复：精准匹配 GeoServer 4326 切片网格
+      // GeoServer 4326 方案通常第0层是 2x1 个切片覆盖全球
+      const resolutions = [];
+      const tileSize = 256;
+      const initialResolution = getWidth(projectionExtent) / tileSize / 2; // 0.703125
+      for (let i = 0; i <= 20; i++) {
+        resolutions.push(initialResolution / Math.pow(2, i));
       }
-    };
 
-    const createHeatmapRenderer = (fieldName) => {
-      const isMoneyField = ["ZCZJ", "ZYSR"].includes(fieldName);
-      return {
-        type: "heatmap", 
-        field: fieldName || null,
-        colorStops: [
-          { color: "rgba(0, 255, 255, 0)", ratio: 0 },
-          { color: "rgba(0, 255, 255, 0.7)", ratio: 0.2 },
-          { color: "rgb(0, 255, 0)", ratio: 0.4 },
-          { color: "rgb(255, 255, 0)", ratio: 0.6 },
-          { color: "rgb(255, 0, 0)", ratio: 0.9 }
-        ],
-        radius: 18, 
-        maxPixelIntensity: isMoneyField ? 100000 : 100, 
-        minPixelIntensity: 0
-      };
-    };
-
-    const handleFieldChange = async () => {
-      if (!view.value) return;
-      
-      const [FeatureLayer] = await loadModules(['esri/layers/FeatureLayer'], {
-        url: MAP_CONFIG.arcgis.js
+      const vtSource = new VectorTileSource({
+        format: new MVT(),
+        url: vtUrl,
+        projection: projection,
+        tileGrid: new TileGrid({
+          extent: projectionExtent,
+          resolutions: resolutions,
+          tileSize: [tileSize, tileSize],
+          origin: getTopLeft(projectionExtent) // 必须是 [-180, 90]
+        }),
+        // 调试用：如果是身份认证问题，可以在这里处理
+        tileLoadFunction: (tile, url) => {
+          tile.setLoader((extent, resolution, projection) => {
+            fetch(url).then(response => {
+              if (response.ok) {
+                response.arrayBuffer().then(data => {
+                  const format = tile.getFormat();
+                  const features = format.readFeatures(data, {
+                    extent: extent,
+                    featureProjection: projection
+                  });
+                  tile.setFeatures(features);
+                });
+              } else {
+                console.error('切片请求失败:', url);
+                tile.setState(3); // Error state
+              }
+            });
+          });
+        }
       });
-      
-      const oldLayer = view.value.map.findLayerById("heatmap_layer");
-      if (oldLayer) {
-        const currentVisible = oldLayer.visible;
-        view.value.map.remove(oldLayer);
-        
-        const graphics = oldLayer.source;
-        const newLayer = new FeatureLayer({
-          id: "heatmap_layer",
-          title: "企业热力图",
-          source: graphics,
-          objectIdField: "custom_oid",
-          renderer: createHeatmapRenderer(selectedHeatmapField.value),
-          visible: currentVisible
+
+      // 2. 热力图矢量源
+      const heatmapSource = new VectorSource();
+
+      // 3. 不可见的切片层（用于触发请求）
+      const dataLoaderLayer = new VectorTileLayer({
+        source: vtSource,
+        visible: true,
+        opacity: 0
+      });
+
+      // 4. 监听要素提取
+      vtSource.on('tileloadend', (event) => {
+        const features = event.tile.getFeatures();
+        if (features && features.length > 0) {
+          heatmapSource.addFeatures(features);
+        }
+      });
+
+      // 5. 热力图展示层
+      heatmapLayer.value = new HeatmapLayer({
+        source: heatmapSource,
+        blur: 25,
+        radius: 15,
+        weight: (feature) => {
+          const field = selectedHeatmapField.value;
+          if (!field) return 1;
+          const val = parseFloat(feature.get(field)) || 0;
+          const scalar = ["ZCZJ", "ZYSR"].includes(field) ? 50000 : 100;
+          return Math.min(val / scalar, 1);
+        }
+      });
+
+      // 6. 初始化地图
+      mapInstance.value = new Map({
+        target: 'heatmapViewDiv',
+        layers: [dataLoaderLayer, heatmapLayer.value],
+        view: new View({
+          projection: 'EPSG:4326',
+          center: [113.2644, 23.1291], // 广州中心
+          zoom: 12,
+          maxZoom: 20
+        })
+      });
+
+      loading.value = false;
+    };
+
+    const handleFieldChange = () => {
+      if (heatmapLayer.value) {
+        heatmapLayer.value.setWeight((feature) => {
+          const field = selectedHeatmapField.value;
+          if (!field) return 1;
+          const val = parseFloat(feature.get(field)) || 0;
+          const scalar = ["ZCZJ", "ZYSR"].includes(field) ? 50000 : 100;
+          return Math.min(val / scalar, 1);
         });
-        
-        view.value.map.add(newLayer);
       }
     };
 
-    const goBack = () => {
-      router.go(-1);
-    };
+    const goBack = () => router.go(-1);
 
-    onMounted(initializeMap);
-    onUnmounted(() => {
-      if (view.value) {
-        view.value.destroy();
-      }
-    });
+    onMounted(() => setTimeout(initMap, 200));
+    onUnmounted(() => mapInstance.value?.setTarget(null));
 
     return {
-      loading,
-      loadingText,
-      selectedHeatmapField,
-      fieldOptions,
-      currentFieldLabel,
-      handleFieldChange,
-      goBack
+      loading, loadingText, selectedHeatmapField, fieldOptions,
+      currentFieldLabel, handleFieldChange, goBack
     };
   }
 };
 </script>
 
 <style lang="scss" scoped>
+/* 样式与之前保持一致 */
 .heatmap-container {
   flex: 1;
-  background: white;
+  background: #000;
   height: 100vh;
   overflow: hidden;
   position: relative;
@@ -204,7 +213,7 @@ export default {
   border-top: 4px solid #0091ff;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 10px;
+  margin-bottom: 10px;
 }
 
 @keyframes spin {
@@ -220,46 +229,43 @@ export default {
   z-index: 100;
   padding: 8px 16px;
   background: #fff;
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
   border-radius: 4px;
   cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
 .heatmap-controls {
   position: absolute;
   top: 20px;
-  left: 80px;
+  left: 120px;
   z-index: 50;
   background: white;
   border-radius: 6px;
   width: 260px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   padding: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .control-group {
-  margin-bottom: 15px;
-
   .label-text {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 5px;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    display: block;
   }
 
   .tip-text {
     font-size: 11px;
     color: #999;
-    margin-top: 5px;
     text-align: right;
+    margin-top: 8px;
   }
 }
 
 .custom-select {
   width: 100%;
-  padding: 5px;
+  padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 13px;
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="main-content">
     <LeftPanel class="left-panel" :summary-data="apiData" />
-    <MiddleMap class="map-center" />
+    <MiddleMap class="map-center" @map-select="handleStartComparison" />
     <RightPanel class="right-panel" :summary-data="apiData" />
   </div>
 </template>
@@ -10,9 +10,9 @@
 import { ref, onMounted, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import LeftPanel from './LeftPanel.vue';
-import MiddleMap from '../summary-display/MiddleMap.vue';
+import MiddleMap from './MiddleMap.vue';
 import RightPanel from './RightPanel.vue';
-import { getDataComparison } from '@/api/data-display';
+import { getDataComparison, getUniqueCodeList } from '@/api/data-display';
 
 const props = defineProps<{
   filterParams?: any;
@@ -62,6 +62,25 @@ const fetchData = async (extraParams = {}) => {
   }
 };
 
+// 2. 处理比对逻辑
+const handleStartComparison = async (codesArray: string[]) => {
+  try {
+    const params = {
+      "uniqueCode": codesArray, // 数组形式：["code1,code2", "code3,code4"]
+      "area": "",
+      "industryDept": props.filterParams?.industryDept || "",
+      // ... 其他参数保持一致
+    };
+    
+    const res = await getUniqueCodeList(params);
+    if (res && res.data) {
+      apiData.value = res.data; 
+    }
+  } catch (error) {
+    console.error('对比失败:', error);
+  }
+};
+
 watch(() => props.filterParams, (newVal) => {
   if (newVal) {
     fetchData(newVal);
@@ -76,17 +95,14 @@ onMounted(() => {
 <style scoped>
 .main-content {
   display: flex;
-  height: 100vh; 
+  height: 100%; 
   width: 100%;
   gap: 10px;
-  border-radius: 6px;
   padding: 0;
   overflow: hidden;
   align-items: stretch; 
 }
  
-.left-panel,
-.map-center,
 .right-panel {
   min-width: 0;
   overflow: auto;

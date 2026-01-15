@@ -7,7 +7,7 @@
 </template>
 
 <script>
-import MapBase from '../summary-display/MiddleMap.vue';
+import MapBase from './Map.vue';
 
 export default {
   components: { MapBase },

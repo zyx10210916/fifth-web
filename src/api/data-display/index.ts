@@ -6,6 +6,7 @@ enum URL {
   getDataComparison = '/api/api-form/form/fifth/gs/getDataComparison',
   getUnitHeatMap = '/api/api-form/form/fifth/gs/getUnitHeatMap',
   getBulletinList = '/api/api-form/form/fifth/gs/getBulletinList',
+  getUniqueCodeList = '/api/api-form/form/fifth/gs/getUniqueCodeList',
 }
 
 // 封装请求方法
@@ -42,6 +43,16 @@ export const getUnitHeatMap = (data: any) => {
 export const getBulletinList = (data: any) => {
   return post<any>({
     url: URL.getBulletinList,
+    data,
+    headers: {
+      'needToken_': 'true'
+    }
+  });
+};
+
+export const getUniqueCodeList = (data: any) => {
+  return post<any>({
+    url: URL.getUniqueCodeList,
     data,
     headers: {
       'needToken_': 'true'
