@@ -30,7 +30,7 @@ export default {
       required: true
     }
   },
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const activeTool = ref(null);
     const draw = shallowRef(null);
     const measureLayer = shallowRef(null);
@@ -272,6 +272,12 @@ export default {
 
     onUnmounted(() => {
       if (measureLayer.value) props.view.map.remove(measureLayer.value);
+    });
+
+    expose({
+      clearAll,
+      startRectSelect,
+      startMeasure
     });
 
     return { activeTool, startMeasure, startRectSelect, clearAll };

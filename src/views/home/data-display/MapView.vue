@@ -21,7 +21,12 @@
         </li>
       </ul>
 
-      <MapTools ref="mapToolsRef" :view="view" @select-complete="handleMapSelection" />
+     <MapTools 
+        ref="mapToolsRef" 
+        :view="view" 
+        :appendMode="appendMode" 
+        @select-complete="handleMapSelection" 
+     />
 
       <div class="layer-tree-panel">
         <div class="panel-header">
@@ -78,11 +83,12 @@ export default {
     initialExtent: { type: Object, default: () => MAP_CONFIG.initialExtent },
     boundaryLayersConfig: { type: Object, default: () => MAP_CONFIG.boundary.layers },
     boundaryBaseUrl: { type: String, default: MAP_CONFIG.boundary.baseUrl },
-    houseLayerUrl: { type: String, default: MAP_CONFIG.economic.houseUrl }
+    houseLayerUrl: { type: String, default: MAP_CONFIG.economic.houseUrl },
+    appendMode: { type: Boolean, default: false }
   },
   emits: ['map-select', 'map-loaded', 'building-points-loaded', 'house-layer-loaded'],
 
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const view = shallowRef(null);
     const mapModules = shallowRef(null);
     const mapIsReady = ref(false);
@@ -96,6 +102,11 @@ export default {
     const layers = ref([]);
     const boundaryLayers = computed(() => layers.value.filter(l => l.type === 'boundary'));
     const buildingLayerState = ref({ visible: true });
+
+    // 转发清除方法
+    const clearMapTools = () => {
+      mapToolsRef.value?.clearAll();
+    };
 
     const houseLayer = ref({
       id: "house",
@@ -252,7 +263,7 @@ export default {
       const SimpleFillSymbol = mapModules.value[8];
 
       // 清除旧高亮
-      if (highlightRef.value) {
+      if (!props.appendMode && highlightRef.value) {
         view.value.graphics.remove(highlightRef.value);
         highlightRef.value = null;
       }
@@ -332,6 +343,11 @@ export default {
     onMounted(initializeMap);
     onUnmounted(() => { if (view.value) view.value.destroy(); });
 
+    expose({
+      getMapView: () => view.value,
+      clearMapTools, 
+    });
+
     return {
       view, mapModules, mapIsReady, buildingLayerRef, buildingLayerState,
       panelVisible, boundaryLayers, houseLayer, mapList: MAP_CONFIG.basemapUI,
@@ -345,7 +361,9 @@ export default {
       fetchBuildingPoints: (p) => buildingLayerRef.value?.fetchBuildingPoints(p),
       loadBuildingPoints: (d) => buildingLayerRef.value?.loadBuildingPoints(d),
       queryBuildingPoints: (c) => buildingLayerRef.value?.queryBuildingPoints(c),
-      getMapView: () => view.value
+      getMapView: () => view.value,
+      mapToolsRef,
+      clearMapTools
     };
   }
 };

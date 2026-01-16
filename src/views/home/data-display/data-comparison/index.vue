@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import LeftPanel from './LeftPanel.vue';
 import MiddleMap from './MiddleMap.vue';
@@ -17,10 +17,11 @@ import { getDataComparison, getUniqueCodeList } from '@/api/data-display';
 const props = defineProps<{
   filterParams?: any;
 }>();
-
+  
 const emit = defineEmits(['update-params']);
 const apiData = ref({});
 const isFirstLoad = ref(true);
+const hasUserFilter = computed(() => props.filterParams && Object.keys(props.filterParams).length > 0);
 
 const fetchData = async (extraParams = {}) => {
   try {
@@ -34,11 +35,14 @@ const fetchData = async (extraParams = {}) => {
       holdingSituation: ""
     };
 
-    const hasUserFilter = props.filterParams && Object.keys(props.filterParams).length > 0;
+    let baseParams = hasUserFilter.value ? { ...props.filterParams } : { ...defaultCompare };
+    if (!baseParams.area || baseParams.area === "") {
+      baseParams.area = defaultCompare.area;
+    }
 
     const params = {
       uniqueCode: "",
-      ...(hasUserFilter ? props.filterParams : defaultCompare),
+      ...baseParams,
       ...extraParams
     };
 
@@ -52,7 +56,7 @@ const fetchData = async (extraParams = {}) => {
     if (res && res.data) {
       apiData.value = res.data;
 
-      if (isFirstLoad.value && !hasUserFilter) {
+      if (isFirstLoad.value && !hasUserFilter.value) {
         emit('update-params', defaultCompare);
         isFirstLoad.value = false;
       }
@@ -62,14 +66,13 @@ const fetchData = async (extraParams = {}) => {
   }
 };
 
-// 2. 处理比对逻辑
+
 const handleStartComparison = async (codesArray: string[]) => {
   try {
     const params = {
-      "uniqueCode": codesArray, // 数组形式：["code1,code2", "code3,code4"]
-      "area": "",
-      "industryDept": props.filterParams?.industryDept || "",
-      // ... 其他参数保持一致
+      "uniqueCode": codesArray, 
+      "area": "", 
+      "industryDept": hasUserFilter.value ? props.filterParams.industryDept : "",
     };
     
     const res = await getUniqueCodeList(params);
@@ -103,13 +106,6 @@ onMounted(() => {
   align-items: stretch; 
 }
  
-.right-panel {
-  min-width: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column; 
-}
- 
 .left-panel {
   flex: 1;
   background: white; 
@@ -122,6 +118,10 @@ onMounted(() => {
  
 .right-panel {
   flex: 1;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column; 
   background: white; 
 }
 </style>

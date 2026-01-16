@@ -2,25 +2,21 @@
   <div class="comparison-map-wrapper">
     <MapView 
       ref="mapView" 
-      @map-select="handleBoxSelect" 
+      :appendMode="true"
+      @map-select="handleSelection" 
     />
-    
+
     <div class="comparison-toolbar">
       <div class="info">
-        已选区域：<span class="count">{{ selectedGroups.length }}</span> 个
+        已选对比区域：<span class="count">{{ selectedGroups.length }}</span> 个
       </div>
       <div class="btns">
         <el-button size="small" @click="clearGroups">清空重选</el-button>
-        <el-button 
-          type="primary" 
-          size="small" 
-          :disabled="selectedGroups.length < 2"
-          @click="startComparison"
-        >
+        <el-button type="primary" size="small" :disabled="selectedGroups.length < 2" @click="startComparison">
           开始比对
         </el-button>
       </div>
-      <div class="tip">提示：使用地图工具拉框选择两个及以上区域</div>
+      <div class="tip">提示：点击地图区域或使用拉框工具选择多个区域</div>
     </div>
   </div>
 </template>
@@ -30,30 +26,35 @@ import { ref } from 'vue';
 import MapView from '../MapView.vue';
 import { message } from 'ant-design-vue';
 
-// 定义事件
 const emit = defineEmits(['map-select']);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
 const selectedGroups = ref<string[]>([]);
-const handleBoxSelect = (codes: string) => {
-  if (!codes || codes === 'warn' || codes === 'none') return;
-  
+
+const handleSelection = (codes: string) => {
+  if (!codes || codes === 'warn' || codes === 'none' || codes === '') return;
+
+  if (selectedGroups.value.includes(codes)) {
+    message.info('该区域已在比对清单中');
+    return;
+  }
+
   selectedGroups.value.push(codes);
-  message.success(`区域 ${selectedGroups.value.length} 选取成功`);
+  message.success(`已添加区域 ${selectedGroups.value.length}`);
 };
 
 const clearGroups = () => {
   selectedGroups.value = [];
-  
-  const view = mapView.value?.getMapView() as any; 
-  
+
+  const view = mapView.value?.getMapView() as any;
   if (view && view.graphics) {
     view.graphics.removeAll();
   }
+  mapView.value?.clearMapTools();
 };
 
 const startComparison = () => {
   if (selectedGroups.value.length < 2) {
-    message.warning('请至少选取两个区域进行比对');
+    message.warning('请至少选择两个区域进行比对');
     return;
   }
   emit('map-select', [...selectedGroups.value]);

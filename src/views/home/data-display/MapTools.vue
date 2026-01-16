@@ -25,12 +25,10 @@ import { loadModules } from 'esri-loader';
 export default {
   name: 'MapTools',
   props: {
-    view: {
-      type: Object,
-      required: true
-    }
+    view: { type: Object, required: true },
+    appendMode: { type: Boolean, default: false }
   },
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const activeTool = ref(null);
     const draw = shallowRef(null);
     const measureLayer = shallowRef(null);
@@ -185,7 +183,9 @@ export default {
     // --- 拉框选择功能 ---
     const startRectSelect = async () => {
       await initModules();
-      clearAll();
+      if (!props.appendMode) {
+        clearAll();
+      }
       activeTool.value = 'rect';
 
       const sketchVM = new SketchVMClass.value({
@@ -243,7 +243,9 @@ export default {
 
         if (results.features.length > 0) {
           console.log(`成功选中 ${results.features.length} 个建筑点`);
-          measureLayer.value.removeAll();
+         if (!props.appendMode) {
+           measureLayer.value.removeAll();
+        }
           const { Graphic } = modules.value;
           results.features.forEach(feature => {
             const highlightGraphic = new Graphic({
@@ -272,6 +274,12 @@ export default {
 
     onUnmounted(() => {
       if (measureLayer.value) props.view.map.remove(measureLayer.value);
+    });
+
+    expose({
+      clearAll,
+      startRectSelect,
+      startMeasure
     });
 
     return { activeTool, startMeasure, startRectSelect, clearAll };
