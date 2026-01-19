@@ -146,7 +146,7 @@ export default {
         });
 
         // 1. 加载边界
-        await loadBoundaryLayers(map);
+        // await loadBoundaryLayers(map);
 
         // 2. 地图就绪后的逻辑
         view.value.when(async () => {
@@ -271,10 +271,10 @@ export default {
       try {
         const hitTest = await view.value.hitTest(event);
         // 查找点击的企业点（通过 ID）
-        const buildingHit = hitTest.results.find(r => r.graphic?.layer?.id === "building");
-        if (buildingHit) {
-          view.value.popup.open({ features: [buildingHit.graphic], location: event.mapPoint });
-        }
+        // const buildingHit = hitTest.results.find(r => r.graphic?.layer?.id === "building");
+        // if (buildingHit) {
+        //   view.value.popup.open({ features: [buildingHit.graphic], location: event.mapPoint });
+        // }
 
         // 面图层逻辑（房屋、镇、区）
         const priorityIds = ["house", "town", "district"];
@@ -301,9 +301,9 @@ export default {
             const query = buildingLayer.createQuery();
             query.geometry = bestFit.geometry;
             query.spatialRelationship = "intersects";
-            query.outFields = ["B109"];
+            query.outFields = ["WYM"];
             const result = await buildingLayer.queryFeatures(query);
-            const codes = result.features.map(f => f.attributes.B109).filter(c => c && c !== 'null').join(',');
+            const codes = result.features.map(f => f.attributes.WYM).filter(c => c && c !== 'null').join(',');
             emit('map-select', codes || 'warn');
           }
         } else if (!buildingHit) {
@@ -344,8 +344,9 @@ export default {
     onUnmounted(() => { if (view.value) view.value.destroy(); });
 
     expose({
+      fetchBuildingPoints,
       getMapView: () => view.value,
-      clearMapTools, 
+      clearMapTools:() => mapToolsRef.value?.clearAll() 
     });
 
     return {

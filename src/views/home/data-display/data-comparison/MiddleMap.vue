@@ -1,10 +1,6 @@
 <template>
   <div class="comparison-map-wrapper">
-    <MapView 
-      ref="mapView" 
-      :appendMode="true"
-      @map-select="handleSelection" 
-    />
+    <MapView ref="mapView" :appendMode="true" @map-select="handleSelection" @map-loaded="handleMapLoaded" />
 
     <div class="comparison-toolbar">
       <div class="info">
@@ -22,13 +18,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import MapView from '../MapView.vue';
 import { message } from 'ant-design-vue';
+
+// 1. 参考 RightMap，接收 filterParams 属性
+const props = defineProps({
+  filterParams: { type: Object, default: () => ({}) }
+});
 
 const emit = defineEmits(['map-select']);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
 const selectedGroups = ref<string[]>([]);
+
+// 2. 参考 RightMap，处理地图加载完成的回调
+// 这样可以确保 MapView 内部的 BuildingLayer 准备好后，立即触发缓存加载逻辑
+const handleMapLoaded = async () => {
+  if (mapView.value) {
+    // 调用 fetchBuildingPoints 会进入 BuildingLayer 的缓存检查判断
+    await mapView.value.fetchBuildingPoints(props.filterParams);
+  }
+};
+
+// 3. 参考 RightMap，监听 filterParams 的变化
+// 虽然点数据现在是全量的，但保持监听可以确保在筛选条件改变时，
+// 地图逻辑能与整体业务逻辑保持同步（哪怕 BuildingLayer 内部拦截了重绘）
+watch(() => props.filterParams, (newParams) => {
+  if (mapView.value) {
+    mapView.value.fetchBuildingPoints(newParams);
+  }
+}, { deep: true });
 
 const handleSelection = (codes: string) => {
   if (!codes || codes === 'warn' || codes === 'none' || codes === '') return;
@@ -44,7 +63,6 @@ const handleSelection = (codes: string) => {
 
 const clearGroups = () => {
   selectedGroups.value = [];
-
   const view = mapView.value?.getMapView() as any;
   if (view && view.graphics) {
     view.graphics.removeAll();
@@ -62,6 +80,7 @@ const startComparison = () => {
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .comparison-map-wrapper {
   position: relative;
   height: 100%;

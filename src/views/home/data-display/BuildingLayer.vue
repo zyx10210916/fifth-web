@@ -1,185 +1,137 @@
 <script>
 import { ref, watch, onUnmounted, markRaw } from 'vue';
-import { getBulletinList } from '@/api/data-display';
+
+// 在组件外部定义全局变量，作为内存缓存
+// 这样即使切换 Tab 导致组件卸载，数据依然保留
+let globalBuildingDataCache = null;
 
 export default {
   name: 'BuildingLayer',
   props: {
-    // 父组件传来的 MapView 实例
     view: { type: Object, required: true },
-    // 父组件加载好的 ArcGIS 模块数组
     modules: { type: Array, required: true },
-    // 图层可见性
-    visible: { type: Boolean, default: true },
-    // 配置项（保持原代码中的默认值）
-    config: {
-      type: Object,
-      default: () => ({
-        id: "building",
-        title: "企业建筑点",
-        fields: [
-          { name: "ObjectId", type: "oid" },
-          { name: "B109", type: "string" },
-          { name: "ZYSR", type: "string" },
-          { name: "ZCZJ", type: "string" },
-          { name: "QMRS", type: "string" },
-          { name: "CYRS", type: "string" }
-        ],
-        popupTemplate: {
-          title: "{B109}",
-          content: [{
-            type: "fields",
-            fieldInfos: [
-              { fieldName: "ZYSR", label: "主营收入" },
-              { fieldName: "ZCZJ", label: "资产总计" },
-              { fieldName: "QMRS", label: "期末人数" },
-              { fieldName: "CYRS", label: "专业人数" }
-            ]
-          }]
-        },
-        renderer: {
-          type: "simple",
-          symbol: {
-            type: "simple-marker",
-            color: [156, 120, 0, 0.8],
-            size: "8px",
-            outline: { color: [255, 255, 255], width: 1 }
-          }
-        }
-      })
-    }
+    visible: { type: Boolean, default: true }
   },
   emits: ['loaded'],
   setup(props, { emit, expose }) {
     const layerInstance = ref(null);
+    const isLoading = ref(false);
 
-    // 内部方法：从模块数组中查找特定的 ArcGIS 类
     const getModule = (name) => {
-      return props.modules.find(m => 
-        (m.prototype?.declaredClass === `esri.${name}`) || 
-        (m.name === name)
+      return props.modules.find(m =>
+        (m.prototype?.declaredClass === `esri.${name}`) || (m.name === name)
       );
     };
 
-    // 初始化图层并添加到地图
     const initLayer = () => {
-      const FeatureLayer = props.modules[2]; // 基于你原代码的 loadModules 顺序
-      
+      const FeatureLayer = props.modules[2];
       const layer = new FeatureLayer({
-        id: props.config.id,
-        title: props.config.title,
+        id: "building",
+        title: "企业建筑点",
         objectIdField: "ObjectId",
         geometryType: "point",
-        outFields: ["*"],
-        source: [], 
-        fields: props.config.fields,
-        popupTemplate: props.config.popupTemplate,
-        renderer: props.config.renderer,
+        spatialReference: { wkid: 4526 },
+        source: [],
+        fields: [
+          { name: "ObjectId", type: "oid" },
+          { name: "WYM", type: "string" },
+          { name: "B102", type: "string" }
+        ],
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "simple-marker",
+            size: 4,
+            color: [255, 68, 0, 0.7],
+            outline: { color: [255, 255, 255], width: 1 }
+          }
+        },
         visible: props.visible,
-        popupEnabled: true,
-        spatialReference: { wkid: 4526 }
+        outFields: ["WYM"] // 严格限制输出字段，节省内存
       });
 
       props.view.map.add(layer);
       layerInstance.value = markRaw(layer);
     };
 
-    // 获取并加载企业点数据
-    const fetchBuildingPoints = async (params = {}) => {
-      try {
-        const res = await getBulletinList({
-          pageNo: 1,
-          pageSize: 2000,
-          ...params
-        });
-        if (res?.data?.list) {
-          await loadBuildingPoints(res.data.list);
-          return res.data.list;
-        }
-        return [];
-      } catch (error) {
-        console.error("获取企业点数据失败:", error);
-        throw error;
+    // 核心加载逻辑：优先检查缓存
+    const fetchBuildingPoints = async () => {
+      if (!layerInstance.value || isLoading.value) return;
+      
+      // 如果缓存已有且图层已有数据，直接返回，什么都不做
+      const count = await layerInstance.value.queryFeatureCount();
+      if (globalBuildingDataCache && count > 0) {
+        console.log("BuildingLayer: 数据已在内存和图层中，跳过所有逻辑");
+        return;
       }
-    };
 
-    // 执行图层数据更新 (applyEdits)
-    const loadBuildingPoints = async (pointsData) => {
-      if (!layerInstance.value || !pointsData) return;
-
-      const Graphic = getModule("Graphic");
-
+      isLoading.value = true;
       try {
-        const existingFeatures = await layerInstance.value.queryFeatures();
-        const edits = { deleteFeatures: existingFeatures.features };
+        const Graphic = getModule("Graphic");
+        
+        // 1. 只在全无缓存时下载
+        if (!globalBuildingDataCache) {
+          console.log("BuildingLayer: 首次加载，下载全量数据");
+          const response = await fetch("http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3Agongbaokupc38&outputFormat=application%2Fjson");
+          const geojson = await response.json();
+          globalBuildingDataCache = geojson.features || [];
+        }
 
-        if (pointsData.length > 0) {
-          const graphics = pointsData.map((item, index) => {
-            const x = parseFloat(item.XZ_AXIS);
-            const y = parseFloat(item.YZ_AXIS);
-            if (isNaN(x) || isNaN(y)) return null;
-
-            return new Graphic({
-              geometry: { type: "point", x, y, spatialReference: { wkid: 4526 } },
-              attributes: {
-                ObjectId: index + 1,
-                B109: item.B109 || "",
-                ZYSR: item.ZYSR || "",
-                ZCZJ: item.ZCZJ || "",
-                QMRS: item.QMRS || "",
-                CYRS: item.CYRS || ""
-              }
-            });
-          }).filter(g => g !== null);
+        // 2. 分批渲染 (只在图层为空时执行)
+        const chunkSize = 5000;
+        for (let i = 0; i < globalBuildingDataCache.length; i += chunkSize) {
+          const chunk = globalBuildingDataCache.slice(i, i + chunkSize);
+          const graphics = chunk.map((f, idx) => new Graphic({
+            geometry: { type: "point", x: f.geometry.coordinates[0], y: f.geometry.coordinates[1], spatialReference: { wkid: 4526 } },
+            attributes: { ObjectId: i + idx + 1, WYM: f.properties.WYM, B102: f.properties.B102 }
+          }));
+          await layerInstance.value.applyEdits({ addFeatures: graphics });
           
-          if (graphics.length > 0) edits.addFeatures = graphics;
+          // 每 2 万点给一次 GC 喘息机会
+          if (i % 200000 === 0) await new Promise(r => setTimeout(r, 30));
         }
-
-        await layerInstance.value.applyEdits(edits);
-        emit('loaded', pointsData);
-      } catch (error) {
-        console.error("加载企业点要素失败:", error);
+      } catch (e) {
+        console.error("加载失败", e);
+      } finally {
+        isLoading.value = false;
       }
     };
 
-    // 内部空间查询方法
-    const queryBuildingPoints = async (condition) => {
+    const queryBuildingPoints = async (geometryOrWhere) => {
       if (!layerInstance.value) return [];
-      try {
-        const query = layerInstance.value.createQuery();
-        query.where = condition;
-        query.returnGeometry = true;
-        query.outFields = ["*"];
-        const result = await layerInstance.value.queryFeatures(query);
-        return result.features || [];
-      } catch (error) {
-        console.error("BuildingLayer 内部查询失败:", error);
-        return [];
+      const query = layerInstance.value.createQuery();
+      if (typeof geometryOrWhere === 'string') {
+        query.where = geometryOrWhere;
+      } else {
+        query.geometry = geometryOrWhere;
       }
+      query.returnGeometry = false; // 查询时不返回几何体以节省性能
+      query.outFields = ["WYM"];
+      const result = await layerInstance.value.queryFeatures(query);
+      return result.features || [];
     };
 
-    // 监听外部可见性变化
-    watch(() => props.visible, (newVal) => {
-      if (layerInstance.value) layerInstance.value.visible = newVal;
-    });
-
-    // 生命周期处理
-    initLayer();
-    onMounted(() =>{
-      if(props.visible)
-{
-  fetchBuildingPoints();
-}    })
+    // 显式销毁逻辑：防止内存泄漏导致 Snap
     onUnmounted(() => {
-      if (layerInstance.value && props.view?.map) {
-        props.view.map.remove(layerInstance.value);
+      if (layerInstance.value) {
+        console.log("[BuildingLayer] 组件卸载，清空图层实例");
+        layerInstance.value.source = []; // 清空 GPU 引用
+        if (props.view?.map) {
+          props.view.map.remove(layerInstance.value);
+        }
+        layerInstance.value.destroy();
+        layerInstance.value = null;
       }
     });
 
-    // 暴露方法给 MapView 使用
+    watch(() => props.visible, (val) => {
+      if (layerInstance.value) layerInstance.value.visible = val;
+    });
+
+    initLayer();
+
     expose({
       fetchBuildingPoints,
-      loadBuildingPoints,
       queryBuildingPoints,
       instance: layerInstance
     });
