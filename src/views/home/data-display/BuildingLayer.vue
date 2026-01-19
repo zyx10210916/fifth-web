@@ -1,9 +1,7 @@
 <script>
-import { ref, watch, onUnmounted, markRaw } from 'vue';
-
-// 在组件外部定义全局变量，作为内存缓存
-// 这样即使切换 Tab 导致组件卸载，数据依然保留
-let globalBuildingDataCache = null;
+import { ref, watch, onUnmounted, markRaw, shallowRef, onMounted } from 'vue';
+import { debounce } from 'lodash-es';
+import { MAP_CONFIG } from '@/config/mapConfig';
 
 export default {
   name: 'BuildingLayer',
@@ -14,126 +12,159 @@ export default {
   },
   emits: ['loaded'],
   setup(props, { emit, expose }) {
-    const layerInstance = ref(null);
+    const layerInstance = shallowRef(null);
+    const wmsLayer = shallowRef(null);
     const isLoading = ref(false);
+    const useWFS = ref(false);
+    const isViewReady = ref(false);
+    
+    let abortController = null; 
+    const loadedKeys = new Set(); 
+    let lastRequestExtent = null; 
 
-    const getModule = (name) => {
-      return props.modules.find(m =>
-        (m.prototype?.declaredClass === `esri.${name}`) || (m.name === name)
-      );
+    // 引用
+    const bldCfg = MAP_CONFIG.economic.building;
+
+    const shouldFetchNewData = (currentExtent) => {
+      return !lastRequestExtent || !lastRequestExtent.contains(currentExtent);
     };
 
-    const initLayer = () => {
+    const debouncedHandleViewChange = debounce(() => {
+      if (!isViewReady.value || !props.view) return;
+      
+      const currentScale = props.view.scale;
+      const isCloseEnough = currentScale > 0 && currentScale <= bldCfg.maxScale;
+
+      if (isCloseEnough && !useWFS.value) {
+        useWFS.value = true;
+        updateLayersVisibility();
+        fetchBuildingPoints(); 
+      } else if (!isCloseEnough && useWFS.value) {
+        useWFS.value = false;
+        if (abortController) abortController.abort();
+        updateLayersVisibility();
+      } else if (useWFS.value && shouldFetchNewData(props.view.extent)) {
+        fetchBuildingPoints();
+      }
+    }, 400);
+
+    const updateLayersVisibility = () => {
+      if (wmsLayer.value) wmsLayer.value.visible = !useWFS.value && props.visible;
+      if (layerInstance.value) layerInstance.value.visible = useWFS.value && props.visible;
+    };
+
+    const initWMSLayer = () => {
+      const WMSLayer = props.modules[10];
+      wmsLayer.value = markRaw(new WMSLayer({
+        id: "building_wms",
+        url: bldCfg.wmsUrl,
+        sublayers: [{ name: bldCfg.layerName, queryable: true }],
+        customParameters: { "TRANSPARENT": "true", "VERSION": "1.1.0", "SRS": "EPSG:4526" },
+        visible: !useWFS.value && props.visible 
+      }));
+      props.view.map.add(wmsLayer.value);
+    };
+
+    const initFeatureLayer = () => {
       const FeatureLayer = props.modules[2];
-      const layer = new FeatureLayer({
+      layerInstance.value = markRaw(new FeatureLayer({
         id: "building",
-        title: "企业建筑点",
         objectIdField: "ObjectId",
         geometryType: "point",
         spatialReference: { wkid: 4526 },
-        source: [],
+        source: [], 
         fields: [
           { name: "ObjectId", type: "oid" },
-          { name: "WYM", type: "string" },
-          { name: "B102", type: "string" }
+          { name: "WYM", type: "string" }
         ],
-        renderer: {
-          type: "simple",
-          symbol: {
-            type: "simple-marker",
-            size: 4,
-            color: [255, 68, 0, 0.7],
-            outline: { color: [255, 255, 255], width: 1 }
-          }
-        },
-        visible: props.visible,
-        outFields: ["WYM"] // 严格限制输出字段，节省内存
-      });
-
-      props.view.map.add(layer);
-      layerInstance.value = markRaw(layer);
+        renderer: { type: "simple", symbol: bldCfg.symbol },
+        visible: useWFS.value && props.visible,
+        outFields: ["*"]
+      }));
+      props.view.map.add(layerInstance.value);
     };
 
-    // 核心加载逻辑：优先检查缓存
     const fetchBuildingPoints = async () => {
-      if (!layerInstance.value || isLoading.value) return;
-      
-      // 如果缓存已有且图层已有数据，直接返回，什么都不做
-      const count = await layerInstance.value.queryFeatureCount();
-      if (globalBuildingDataCache && count > 0) {
-        console.log("BuildingLayer: 数据已在内存和图层中，跳过所有逻辑");
-        return;
-      }
+      if (!layerInstance.value || !useWFS.value) return;
+      if (abortController) abortController.abort();
+      abortController = new AbortController();
 
       isLoading.value = true;
       try {
-        const Graphic = getModule("Graphic");
-        
-        // 1. 只在全无缓存时下载
-        if (!globalBuildingDataCache) {
-          console.log("BuildingLayer: 首次加载，下载全量数据");
-          const response = await fetch("http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3Agongbaokupc38&outputFormat=application%2Fjson");
-          const geojson = await response.json();
-          globalBuildingDataCache = geojson.features || [];
-        }
+        const Graphic = props.modules.find(m => m.name === 'Graphic' || m.prototype?.declaredClass === "esri.Graphic");
+        const ext = props.view.extent;
+        if (!ext) return;
 
-        // 2. 分批渲染 (只在图层为空时执行)
-        const chunkSize = 5000;
-        for (let i = 0; i < globalBuildingDataCache.length; i += chunkSize) {
-          const chunk = globalBuildingDataCache.slice(i, i + chunkSize);
-          const graphics = chunk.map((f, idx) => new Graphic({
-            geometry: { type: "point", x: f.geometry.coordinates[0], y: f.geometry.coordinates[1], spatialReference: { wkid: 4526 } },
-            attributes: { ObjectId: i + idx + 1, WYM: f.properties.WYM, B102: f.properties.B102 }
-          }));
+        // 外扩缓冲区并获取 URL
+        const paddedExt = ext.clone().expand(1.5);
+        lastRequestExtent = paddedExt;
+        const bbox = `${paddedExt.xmin},${paddedExt.ymin},${paddedExt.xmax},${paddedExt.ymax},EPSG:4526`;
+        const url = bldCfg.getWfsUrl(bbox); 
+        
+        const response = await fetch(url, { signal: abortController.signal });
+        const geojson = await response.json();
+        const features = (geojson.features || []).filter(f => !loadedKeys.has(f.properties.WYM));
+        
+        if (features.length === 0) return;
+
+        const chunkSize = 2000;
+        for (let i = 0; i < features.length; i += chunkSize) {
+          if (abortController.signal.aborted) break;
+          const graphics = features.slice(i, i + chunkSize).map(f => {
+            loadedKeys.add(f.properties.WYM);
+            return new Graphic({
+              geometry: { type: "point", x: f.geometry.coordinates[0], y: f.geometry.coordinates[1], spatialReference: { wkid: 4526 } },
+              attributes: { ObjectId: Date.now() + Math.random(), WYM: f.properties.WYM }
+            });
+          });
           await layerInstance.value.applyEdits({ addFeatures: graphics });
-          
-          // 每 2 万点给一次 GC 喘息机会
-          if (i % 200000 === 0) await new Promise(r => setTimeout(r, 30));
+          await new Promise(r => setTimeout(r, 16));
         }
+        emit('loaded', geojson.features);
       } catch (e) {
-        console.error("加载失败", e);
+        if (e.name !== 'AbortError') console.error("[BuildingLayer] Error:", e);
       } finally {
         isLoading.value = false;
       }
     };
 
-    const queryBuildingPoints = async (geometryOrWhere) => {
-      if (!layerInstance.value) return [];
-      const query = layerInstance.value.createQuery();
-      if (typeof geometryOrWhere === 'string') {
-        query.where = geometryOrWhere;
-      } else {
-        query.geometry = geometryOrWhere;
-      }
-      query.returnGeometry = false; // 查询时不返回几何体以节省性能
-      query.outFields = ["WYM"];
-      const result = await layerInstance.value.queryFeatures(query);
-      return result.features || [];
+    const init = () => {
+      props.view.when(() => {
+        if (props.view.scale > 0) {
+          isViewReady.value = true;
+          initWMSLayer();
+          initFeatureLayer();
+          props.view.watch('scale', debouncedHandleViewChange);
+          props.view.watch('extent', debouncedHandleViewChange); 
+          debouncedHandleViewChange(); 
+        } else {
+          const tempWatch = props.view.watch("scale", (s) => {
+            if (s > 0) { tempWatch.remove(); init(); }
+          });
+        }
+      });
     };
 
-    // 显式销毁逻辑：防止内存泄漏导致 Snap
-    onUnmounted(() => {
-      if (layerInstance.value) {
-        console.log("[BuildingLayer] 组件卸载，清空图层实例");
-        layerInstance.value.source = []; // 清空 GPU 引用
-        if (props.view?.map) {
-          props.view.map.remove(layerInstance.value);
-        }
-        layerInstance.value.destroy();
-        layerInstance.value = null;
-      }
-    });
-
     watch(() => props.visible, (val) => {
-      if (layerInstance.value) layerInstance.value.visible = val;
+      if (!val) { loadedKeys.clear(); lastRequestExtent = null; }
+      updateLayersVisibility();
     });
 
-    initLayer();
+    onMounted(init);
+    onUnmounted(() => {
+      abortController?.abort();
+      if (layerInstance.value) props.view.map.remove(layerInstance.value);
+      if (wmsLayer.value) props.view.map.remove(wmsLayer.value);
+      loadedKeys.clear();
+    });
 
     expose({
-      fetchBuildingPoints,
-      queryBuildingPoints,
-      instance: layerInstance
+      queryBuildingPoints: async (q) => {
+        if (!layerInstance.value) return [];
+        const query = layerInstance.value.createQuery();
+        if (typeof q === 'string') query.where = q; else query.geometry = q;
+        return await layerInstance.value.queryFeatures(query);
+      }
     });
 
     return () => null;

@@ -21,12 +21,7 @@
         </li>
       </ul>
 
-     <MapTools 
-        ref="mapToolsRef" 
-        :view="view" 
-        :appendMode="appendMode" 
-        @select-complete="handleMapSelection" 
-     />
+      <MapTools ref="mapToolsRef" :view="view" :appendMode="appendMode" @select-complete="handleMapSelection" />
 
       <div class="layer-tree-panel">
         <div class="panel-header">
@@ -67,7 +62,7 @@
 </template>
 
 <script>
-import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw, nextTick } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapTools from './MapTools.vue';
 import BuildingLayer from './BuildingLayer.vue';
@@ -124,25 +119,67 @@ export default {
           'esri/Map', 'esri/views/MapView', 'esri/layers/FeatureLayer',
           'esri/Graphic', 'esri/geometry/SpatialReference', 'esri/Basemap',
           'esri/layers/TileLayer', 'esri/layers/GeoJSONLayer',
-          'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query'
+          'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query',
+          'esri/layers/WMSLayer', 'esri/widgets/Zoom'
         ], { url: MAP_CONFIG.arcgis.js, css: MAP_CONFIG.arcgis.css });
 
         mapModules.value = modules;
-        const [Map, MapView, FeatureLayer, Graphic, SpatialReference, Basemap, TileLayer] = modules;
+        const [
+          Map, MapView, FeatureLayer, Graphic, SpatialReference,
+          Basemap, TileLayer, GeoJSONLayer, SimpleFillSymbol,
+          Query, WMSLayer, Zoom
+        ] = modules;
+
+        provide('arcgisModules', mapModules.value);
+        provide('mapView', view.value);
 
         const map = new Map({
           basemap: new Basemap({
-            baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
+            // baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
+            basemap: null,
             id: "street"
           })
         });
 
-        view.value = new MapView({
-          container: "viewDiv",
-          map: map,
-          spatialReference: new SpatialReference({ wkid: 4526 }),
-          extent: props.initialExtent,
-          ui: { components: [] }
+       view.value = new MapView({
+        container: "viewDiv",
+        map: map,
+        spatialReference: { wkid: 4526 },
+        extent: props.initialExtent,
+        zoom: 12, // [新增] 强制给定一个初始层级参考，防止其停留在 -1
+        constraints: {
+          minZoom: 10,
+          maxZoom: 18,
+          rotationEnabled: false
+        }
+      });
+
+        // 替换原来的view.when()逻辑 
+        view.value.when(() => {
+          console.log("地图初始化完成，当前缩放:", view.value.zoom);
+
+          // 添加延迟确保完全就绪
+          setTimeout(() => {
+            // 添加缩放控件
+            const zoomWidget = new Zoom({
+              view: view.value,
+              layout: "vertical"
+            });
+            view.value.ui.add(zoomWidget, "bottom-right");
+
+            // 监听缩放变化（防抖处理）
+            const zoomHandle = view.value.watch('zoom', debounce((zoom) => {
+              console.log("有效缩放级别:", zoom);
+              if (zoom >= 0) {
+                levelNode.innerHTML = `当前层级: ${zoom.toFixed(1)}`;
+              }
+            }, 300));
+
+            // 组件卸载时清理
+            onUnmounted(() => zoomHandle.remove());
+
+            mapIsReady.value = true;
+          }, 500); // 增加500ms延迟确保稳定性 
         });
 
         // 1. 加载边界
@@ -150,7 +187,35 @@ export default {
 
         // 2. 地图就绪后的逻辑
         view.value.when(async () => {
+          // 1. 添加缩放控件
+          const zoomWidget = new Zoom({ view: view.value });
+          view.value.ui.add(zoomWidget, "bottom-right");
+
+          // 2. 添加层级提示节点
+          const levelNode = document.createElement("div");
+          levelNode.style.cssText = `
+          padding: 6px 10px;
+          background: rgba(255, 255, 255, 0.8);
+          font-size: 14px;
+          font-weight: bold;
+          border-radius: 4px;
+          margin-bottom: 20px;
+          margin-left: 10px;
+          z-index: 99;
+        `;
+          view.value.ui.add(levelNode, "bottom-left");
+
+          // 初始化层级显示
+          levelNode.innerHTML = `当前层级: ${view.value.zoom?.toFixed(1) || '加载中'}`;
+
+          // 3. 监听缩放并更新
+          view.value.watch("zoom", (val) => {
+            console.log("MapView 监听到缩放:", val);
+            levelNode.innerHTML = `当前层级: ${val.toFixed(1)}`;
+          });
+
           mapIsReady.value = true;
+          await nextTick();
 
           // --- 关键点：初始化即刻请求接口 ---
           await loadHouseLayer();
@@ -231,7 +296,7 @@ export default {
           objectIdField: "OBJECTID",
           fields: [
             { name: "OBJECTID", type: "oid" },
-            { name: "B109", type: "string" } 
+            { name: "B109", type: "string" }
           ],
           renderer: {
             type: "simple",
@@ -313,7 +378,15 @@ export default {
     };
 
     // --- 供外部调用的方法（转发到 BuildingLayer 子组件） ---
-    const fetchBuildingPoints = (params) => buildingLayerRef.value?.fetchBuildingPoints(params);
+    const fetchBuildingPoints = async (params) => {
+      // 增加可选链和 nextTick 确保子组件已挂载
+      if (buildingLayerRef.value?.fetchBuildingPoints) {
+        return await buildingLayerRef.value.fetchBuildingPoints(params);
+      } else {
+        // 如果还没加载好，等待一会重试，或者直接返回
+        console.warn("BuildingLayer 还未准备好方法");
+      }
+    };
     const loadBuildingPoints = (data) => buildingLayerRef.value?.loadBuildingPoints(data);
     const queryBuildingPoints = (cond) => buildingLayerRef.value?.queryBuildingPoints(cond);
 
@@ -346,7 +419,7 @@ export default {
     expose({
       fetchBuildingPoints,
       getMapView: () => view.value,
-      clearMapTools:() => mapToolsRef.value?.clearAll() 
+      clearMapTools: () => mapToolsRef.value?.clearAll()
     });
 
     return {
@@ -371,6 +444,27 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+#viewDiv .esri-ui {
+  z-index: 1000;
+}
+
+/* 自定义层级显示样式 */
+.zoom-level-display {
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  margin-left: 10px;
+  z-index: 99;
+}
+
+#viewDiv .esri-ui-bottom-left {
+  z-index: 2000;
+  /* 确保在所有面板之上 */
+}
+
 .map-container {
   flex: 1;
   background: white;
