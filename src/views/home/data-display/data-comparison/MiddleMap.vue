@@ -67,7 +67,9 @@ const clearGroups = () => {
   if (view && view.graphics) {
     view.graphics.removeAll();
   }
-  mapView.value?.clearMapTools();
+ if (mapView.value) {
+    mapView.value.clearMapTools(); 
+  }
 };
 
 const startComparison = () => {

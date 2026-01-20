@@ -25,13 +25,13 @@ export const MAP_CONFIG = {
     spatialReference: { wkid: 4526 }
   },
 
-  // 经济数据专题配置 (包含建筑点和房屋面)
-  economic: {
+  // 经济数据配置 
+   economic: {
     building: {
+      id: "building", 
       maxScale: 30000,
       layerName: LAYER_BUILDING,
       wmsUrl: `${GEOSERVER_BASE}/wms`,
-      // 封装 WFS URL 生成逻辑，组件内只需传入 bbox
       getWfsUrl: (bbox: string) => {
         const params = new URLSearchParams({
           service: "WFS",
@@ -44,8 +44,10 @@ export const MAP_CONFIG = {
         });
         return `${GEOSERVER_BASE}/ows?${params.toString()}`;
       },
+      // 点默认样式
       symbol: {
         type: "simple-marker",
+        style: "circle",
         size: 3.571,
         color: [125, 94, 178, 1],
         outline: { color: [35, 35, 35], width: 0 }
@@ -61,7 +63,7 @@ export const MAP_CONFIG = {
     satellite: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/1e8f0689c7f84b3581bf98449ed8e700/DataServer"
   },
 
-  // 其他配置保持不变...
+  // 底图切换控件UI
   basemapUI: [
     { id: 'street', name: '地图', className: 'mapType-normal', imgNormal: dtNormal, imgActive: dtActive },
     { id: 'satellite', name: '影像图', className: 'mapType-image', imgNormal: yxtNormal, imgActive: yxtActive }
@@ -76,9 +78,31 @@ export const MAP_CONFIG = {
   },
 
   styles: {
+    // 区域面高亮样式
     highlight: {
+      type: "simple-fill",
       color: [0, 255, 255, 0.25],
       outline: { color: [0, 255, 255, 1], width: 2.5 }
+    },
+    // 点高亮样式
+    highlightPoint: {
+      type: "simple-marker",
+      style: "circle",
+      color: [255, 68, 0, 0.9], // 橙红色
+      size: 3.571, 
+      xoffset: 0,
+      yoffset: 0,
+      outline: { color: [255, 255, 255], width: 1 } 
+    },
+    // 拉框时的多边形样式
+    selectionRect: {
+      type: "simple-fill",
+      color: [0, 145, 255, 0.15],
+      outline: {
+        color: [0, 145, 255],
+        width: 2,
+        style: "dash"
+      }
     }
   }
 };

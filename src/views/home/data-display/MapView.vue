@@ -141,83 +141,30 @@ export default {
           })
         });
 
-       view.value = new MapView({
-        container: "viewDiv",
-        map: map,
-        spatialReference: { wkid: 4526 },
-        extent: props.initialExtent,
-        zoom: 12, // [新增] 强制给定一个初始层级参考，防止其停留在 -1
-        constraints: {
-          minZoom: 10,
-          maxZoom: 18,
-          rotationEnabled: false
-        }
-      });
-
-        // 替换原来的view.when()逻辑 
-        view.value.when(() => {
-          console.log("地图初始化完成，当前缩放:", view.value.zoom);
-
-          // 添加延迟确保完全就绪
-          setTimeout(() => {
-            // 添加缩放控件
-            const zoomWidget = new Zoom({
-              view: view.value,
-              layout: "vertical"
-            });
-            view.value.ui.add(zoomWidget, "bottom-right");
-
-            // 监听缩放变化（防抖处理）
-            const zoomHandle = view.value.watch('zoom', debounce((zoom) => {
-              console.log("有效缩放级别:", zoom);
-              if (zoom >= 0) {
-                levelNode.innerHTML = `当前层级: ${zoom.toFixed(1)}`;
-              }
-            }, 300));
-
-            // 组件卸载时清理
-            onUnmounted(() => zoomHandle.remove());
-
-            mapIsReady.value = true;
-          }, 500); // 增加500ms延迟确保稳定性 
+        view.value = new MapView({
+          container: "viewDiv",
+          map: map,
+          spatialReference: { wkid: 4526 },
+          extent: props.initialExtent,
+          ui: { components: ["zoom"] }
         });
 
-        // 1. 加载边界
-        // await loadBoundaryLayers(map);
-
-        // 2. 地图就绪后的逻辑
         view.value.when(async () => {
-          // 1. 添加缩放控件
-          const zoomWidget = new Zoom({ view: view.value });
-          view.value.ui.add(zoomWidget, "bottom-right");
+          console.log("地图初始化完成");
 
-          // 2. 添加层级提示节点
-          const levelNode = document.createElement("div");
-          levelNode.style.cssText = `
-          padding: 6px 10px;
-          background: rgba(255, 255, 255, 0.8);
-          font-size: 14px;
-          font-weight: bold;
-          border-radius: 4px;
-          margin-bottom: 20px;
-          margin-left: 10px;
-          z-index: 99;
-        `;
-          view.value.ui.add(levelNode, "bottom-left");
-
-          // 初始化层级显示
-          levelNode.innerHTML = `当前层级: ${view.value.zoom?.toFixed(1) || '加载中'}`;
-
-          // 3. 监听缩放并更新
-          view.value.watch("zoom", (val) => {
-            console.log("MapView 监听到缩放:", val);
-            levelNode.innerHTML = `当前层级: ${val.toFixed(1)}`;
+          // 缩放控件
+          const zoomWidget = new Zoom({
+            view: view.value,
+            layout: "vertical"
           });
+          view.value.ui.add(zoomWidget, "bottom-right");
 
           mapIsReady.value = true;
           await nextTick();
+          // 加载边界
+          // await loadBoundaryLayers(map);
 
-          // --- 关键点：初始化即刻请求接口 ---
+          // 加载房屋面
           await loadHouseLayer();
 
           view.value.on("click", handleMapClickQuery);
@@ -249,8 +196,6 @@ export default {
     const loadHouseLayer = async () => {
       if (houseLayer.value.loaded || houseLayer.value.isFetching) return;
       houseLayer.value.isFetching = true;
-
-      // 确保拿到了对应的 ArcGIS 模块
       const [, , FeatureLayer, Graphic] = mapModules.value;
 
       try {
@@ -262,12 +207,10 @@ export default {
           return;
         }
 
-        // 1. 将 GeoJSON 转换为 ArcGIS 支持的 Graphics
+        // 将 GeoJSON 转换为Graphics
         const graphics = data.features.map((feature, index) => {
           let rings = [];
           if (feature.geometry.type === "MultiPolygon") {
-            // 关键：GeoJSON MultiPolygon 是 4 层数组，ArcGIS rings 是 3 层
-            // 我们需要把所有的面（Polygons）的环（Rings）摊平到一个数组里
             rings = feature.geometry.coordinates.reduce((acc, polygon) => {
               return acc.concat(polygon);
             }, []);
@@ -279,16 +222,16 @@ export default {
             geometry: {
               type: "polygon",
               rings: rings,
-              spatialReference: { wkid: 4526 } // 匹配你的坐标数据
+              spatialReference: { wkid: 4526 } 
             },
             attributes: {
               ...feature.properties,
-              OBJECTID: index + 1 // 必须提供一个唯一的 ID 字段
+              OBJECTID: index + 1 
             }
           });
         });
 
-        // 2. 创建客户端 FeatureLayer
+        // 创建 FeatureLayer
         const layer = new FeatureLayer({
           id: "house",
           title: "企业房屋面",
@@ -306,7 +249,6 @@ export default {
               outline: { color: [0, 121, 193, 0.8], width: 1.5 }
             }
           },
-          // 初始化时根据 houseLayer.visible 决定是否显示
           visible: houseLayer.value.visible,
           outFields: ["*"]
         });
@@ -335,11 +277,11 @@ export default {
 
       try {
         const hitTest = await view.value.hitTest(event);
-        // 查找点击的企业点（通过 ID）
-        // const buildingHit = hitTest.results.find(r => r.graphic?.layer?.id === "building");
-        // if (buildingHit) {
-        //   view.value.popup.open({ features: [buildingHit.graphic], location: event.mapPoint });
-        // }
+        //查找点击的企业点（通过 ID）
+        const buildingHit = hitTest.results.find(r => r.graphic?.layer?.id === "building");
+        if (buildingHit) {
+          view.value.popup.open({ features: [buildingHit.graphic], location: event.mapPoint });
+        }
 
         // 面图层逻辑（房屋、镇、区）
         const priorityIds = ["house", "town", "district"];
@@ -379,18 +321,16 @@ export default {
 
     // --- 供外部调用的方法（转发到 BuildingLayer 子组件） ---
     const fetchBuildingPoints = async (params) => {
-      // 增加可选链和 nextTick 确保子组件已挂载
       if (buildingLayerRef.value?.fetchBuildingPoints) {
         return await buildingLayerRef.value.fetchBuildingPoints(params);
       } else {
-        // 如果还没加载好，等待一会重试，或者直接返回
         console.warn("BuildingLayer 还未准备好方法");
       }
     };
     const loadBuildingPoints = (data) => buildingLayerRef.value?.loadBuildingPoints(data);
     const queryBuildingPoints = (cond) => buildingLayerRef.value?.queryBuildingPoints(cond);
 
-    // --- 其他底图和图层控制方法 (逻辑同原代码) ---
+    // 底图和图层控制方法
     const handleBasemapChange = (id) => {
       const Basemap = mapModules.value[5];
       const TileLayer = mapModules.value[6];
@@ -480,8 +420,8 @@ export default {
 
 .layer-tree-panel {
   position: absolute;
-  top: 20px;
-  left: 2%;
+  top: 1%;
+  left: 5%;
   z-index: 50;
   background: white;
   border-radius: 6px;

@@ -68,7 +68,7 @@ export default {
     const initFeatureLayer = () => {
       const FeatureLayer = props.modules[2];
       layerInstance.value = markRaw(new FeatureLayer({
-        id: "building",
+        id: bldCfg.id,
         objectIdField: "ObjectId",
         geometryType: "point",
         spatialReference: { wkid: 4526 },
@@ -77,7 +77,7 @@ export default {
           { name: "ObjectId", type: "oid" },
           { name: "WYM", type: "string" }
         ],
-        renderer: { type: "simple", symbol: bldCfg.symbol },
+        renderer: { type: "simple", symbol: bldCfg.symbol }, 
         visible: useWFS.value && props.visible,
         outFields: ["*"]
       }));

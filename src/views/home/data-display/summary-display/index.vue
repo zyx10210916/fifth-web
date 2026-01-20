@@ -13,27 +13,37 @@ import MiddleMap from './MiddleMap.vue';
 import RightPanel from './RightPanel.vue';
 import { getGsSumDataDisplay } from '@/api/data-display';
 
+
 const props = defineProps<{
   filterParams?: any;
 }>();
 
 const apiData = ref({});
 const currentUniqueCode = ref("");
+const lastRequestSnapshot = ref("");
 
 const fetchData = async (extraParams = {}) => {
+  const params = {
+    "uniqueCode": currentUniqueCode.value,
+    "area": "",
+    "industryDept": "",
+    "registerType": "",
+    "unitScale": "",
+    "businessOperationType": "",
+    "industryCategory": "",
+    "holdingSituation": "",
+    ...extraParams
+  };
+
+  const currentSnapshot = JSON.stringify(params);
+  if (currentSnapshot === lastRequestSnapshot.value) {
+    console.log("请求参数未变化，拦截重复请求");
+    return; 
+  }
+  
+  lastRequestSnapshot.value = currentSnapshot;
+
   try {
-    const params = {
-      "uniqueCode": currentUniqueCode.value,
-      "area": "",
-      "industryDept": "",
-      "registerType": "",
-      "unitScale": "",
-      "businessOperationType": "",
-      "industryCategory": "",
-      "holdingSituation": "",
-      ...extraParams
-    };
-    
     const res = await getGsSumDataDisplay(params);
     if (res && res.data) {
       apiData.value = res.data;
@@ -44,11 +54,10 @@ const fetchData = async (extraParams = {}) => {
 };
 
 const handleMapSelectChange = (codes: string) => {
-  if (codes === '') {
-    currentUniqueCode.value = "";
-  } else {
-    currentUniqueCode.value = codes;
+  if (codes === '' && currentUniqueCode.value === "") {
+    return;
   }
+  currentUniqueCode.value = codes === '' ? "" : codes;
   fetchData(props.filterParams || {});
 };
 
@@ -66,33 +75,33 @@ onMounted(() => {
 <style scoped>
 .main-content {
   display: flex;
-  height: 100%; 
+  height: 100%;
   width: 100%;
   gap: 10px;
   padding: 0;
   overflow: hidden;
-  align-items: stretch; 
+  align-items: stretch;
 }
- 
+
 .right-panel {
   min-width: 0;
   overflow: auto;
   display: flex;
-  flex-direction: column; 
+  flex-direction: column;
 }
- 
+
 .left-panel {
   flex: 1;
-  background: white; 
+  background: white;
 }
- 
+
 .map-center {
   flex: 2.5;
-  background: white; 
+  background: white;
 }
- 
+
 .right-panel {
   flex: 1;
-  background: white; 
+  background: white;
 }
 </style>

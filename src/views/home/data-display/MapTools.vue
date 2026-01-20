@@ -21,6 +21,7 @@
 <script>
 import { ref, shallowRef, onUnmounted } from 'vue';
 import { loadModules } from 'esri-loader';
+import { MAP_CONFIG } from '@/config/mapConfig';
 
 export default {
   name: 'MapTools',
@@ -33,7 +34,7 @@ export default {
     const draw = shallowRef(null);
     const measureLayer = shallowRef(null);
     const modules = shallowRef({});
-
+    const currentSketchVM = shallowRef(null);
     const SketchVMClass = shallowRef(null);
 
     const initModules = async () => {
@@ -42,16 +43,18 @@ export default {
         GraphicsLayer,
         Graphic,
         geometryEngine,
-        SketchViewModel
+        SketchViewModel,
+        Point
       ] = await loadModules([
         'esri/views/draw/Draw',
         'esri/layers/GraphicsLayer',
         'esri/Graphic',
         'esri/geometry/geometryEngine',
-        'esri/widgets/Sketch/SketchViewModel'
+        'esri/widgets/Sketch/SketchViewModel',
+        'esri/geometry/Point'
       ]);
 
-      modules.value = { Draw, GraphicsLayer, Graphic, geometryEngine };
+      modules.value = { Draw, GraphicsLayer, Graphic, geometryEngine, Point };
       SketchVMClass.value = SketchViewModel;
 
       draw.value = new Draw({ view: props.view });
@@ -66,16 +69,30 @@ export default {
       }
     };
 
-    const clearAll = () => {
+    // 停止当前活动工具
+    const destroyActiveTools = () => {
+      if (draw.value) {
+        draw.value.reset();
+      }
+      if (currentSketchVM.value) {
+        currentSketchVM.value.destroy();
+        currentSketchVM.value = null;
+      }
+    };
+
+    const clearAll = (shouldNotify = true) => {
       measureLayer.value?.removeAll();
+      destroyActiveTools();
       activeTool.value = null;
-      emit('select-complete','');
+      if (shouldNotify) {
+        emit('select-complete', '');
+      }
     };
 
     // --- 测量功能 ---
     const startMeasure = async (type) => {
       await initModules();
-      clearAll();
+      clearAll(false);
       activeTool.value = type;
 
       const isLine = type === 'distance';
@@ -117,7 +134,7 @@ export default {
             symbol: {
               type: "simple-marker",
               color: [255, 68, 0],
-              size: "12px", 
+              size: "12px",
               outline: {
                 color: [255, 255, 255],
                 width: 1
@@ -180,9 +197,17 @@ export default {
 
       action.on(["cursor-update", "vertex-add", "draw-complete"], handleUpdate);
     };
+
     // --- 拉框选择功能 ---
+    //拉框逻辑
     const startRectSelect = async () => {
       await initModules();
+      destroyActiveTools();
+
+      if (currentSketchVM.value) {
+        currentSketchVM.value.destroy();
+      }
+
       if (!props.appendMode) {
         clearAll();
       }
@@ -192,27 +217,18 @@ export default {
         view: props.view,
         layer: measureLayer.value,
         updateOnGraphicClick: false,
-        polygonSymbol: {
-          type: "simple-fill",
-          color: [0, 145, 255, 0.15],
-          outline: {
-            color: [0, 145, 255],
-            width: 2,
-            style: "dash"
-          }
-        },
+        polygonSymbol: MAP_CONFIG.styles.selectionRect,
         defaultCreateOptions: {
           mode: "click",
           toggleToolOnClick: true
         }
       });
-
+      currentSketchVM.value = sketchVM;
       sketchVM.create("polygon");
       sketchVM.on("create", (event) => {
         if (event.state === "complete") {
           querySelectedPoints(event.graphic.geometry);
           activeTool.value = null;
-          sketchVM.destroy();
         }
       });
 
@@ -221,43 +237,87 @@ export default {
       });
     };
 
-    // 查询逻辑
-   const querySelectedPoints = async (geometry) => {
-  const buildingLayer = props.view.map.findLayerById('building');
-  if (!buildingLayer) return;
+    // 高亮选中及发送查询逻辑
+    const querySelectedPoints = async (geometry) => {
+      const bldCfg = MAP_CONFIG.economic.building;
+      const buildingLayer = props.view.map.findLayerById(bldCfg.id); 
+      const highlightStyle = MAP_CONFIG.styles.highlightPoint;
 
-  try {
-    // 1. 仅获取 WYM 字段，且不返回几何信息以节省性能
-    const results = await buildingLayer.queryFeatures({
-      geometry: geometry,
-      outFields: ["WYM"],
-      returnGeometry: false // 核心优化：拉框只为拿代码，不为拿坐标
-    });
+      if (!buildingLayer) return;
 
-    const codesArray = results.features.map(f => f.attributes.WYM).filter(c => c);
-    const codes = [...new Set(codesArray)].join(',');
+      try {
+        if (!modules.value.Point) await initModules();
+        const { Graphic, geometryEngine, Point } = modules.value;
+        const layerView = await props.view.whenLayerView(buildingLayer);
+        const viewSR = props.view.spatialReference;
 
-    emit('select-complete', codes);
+        // --- 获取数据 ---
+        const ext = geometry.extent;
+        const bbox = `${ext.xmin},${ext.ymin},${ext.xmax},${ext.ymax}`;
+        const response = await fetch(bldCfg.getWfsUrl(bbox));
+        const geojson = await response.json();
+        const candidates = geojson.features || [];
 
-    if (codesArray.length > 0) {
-      console.log(`选中数量: ${codesArray.length}`);
-      
-      // 2. 核心优化：不要循环创建 Graphic 高亮
-      // 改用 FeatureEffect 整体高亮选中的点，其余点变暗，性能提升 100 倍
-      const layerView = await props.view.whenLayerView(buildingLayer);
-      layerView.featureEffect = {
-        filter: {
-          where: `WYM IN ('${codesArray.join("','")}')`
-        },
-        includedEffect: "bloom(1.5, 0.5px, 0.1) saturate(200%)", // 选中的点发光
-        excludedEffect: "blur(1px) opacity(0.3) grayscale(100%)"  // 未选中的点模糊透明
-      };
-    }
-  } catch (err) {
-    console.error("查询失败:", err);
-  }
-};
+        // --- 过滤逻辑 ---
+        const featuresInPoly = candidates.filter(f => {
+          const pt = new Point({
+            x: Number(f.geometry.coordinates[0]),
+            y: Number(f.geometry.coordinates[1]),
+            spatialReference: viewSR
+          });
+          return geometryEngine.contains(geometry, pt);
+        });
 
+        // --- 清理逻辑 ---
+        if (!props.appendMode) {
+          measureLayer.value.removeAll();
+          const rectGraphic = new Graphic({
+            geometry: geometry,
+            symbol: MAP_CONFIG.styles.selectionRect 
+          });
+          measureLayer.value.add(rectGraphic);
+        } else {
+        }
+
+        // ---  渲染高亮点 ---
+        const coordinateMap = new Map();
+        const allSelectedWyms = [];
+
+        featuresInPoly.forEach(f => {
+          const wym = f.properties.WYM;
+          if (!wym) return;
+          allSelectedWyms.push(wym);
+
+          const x = Number(f.geometry.coordinates[0]);
+          const y = Number(f.geometry.coordinates[1]);
+          const geoKey = `${x.toFixed(6)},${y.toFixed(6)}`;
+
+          if (!coordinateMap.has(geoKey)) {
+            coordinateMap.set(geoKey, {
+              geometry: new Point({ x, y, spatialReference: viewSR }),
+              wyms: [wym]
+            });
+          } else {
+            coordinateMap.get(geoKey).wyms.push(wym);
+          }
+        });
+
+        // 发送代码
+        emit('select-complete', [...new Set(allSelectedWyms)].join(','));
+
+        // 绘制高亮点
+        coordinateMap.forEach((data) => {
+          measureLayer.value.add(new Graphic({
+            geometry: data.geometry,
+            symbol: highlightStyle,
+            attributes: { wyms: data.wyms }
+          }));
+        });
+
+      } catch (err) {
+        console.error("MapTools 查询失败:", err);
+      }
+    };
     onUnmounted(() => {
       if (measureLayer.value) props.view.map.remove(measureLayer.value);
     });

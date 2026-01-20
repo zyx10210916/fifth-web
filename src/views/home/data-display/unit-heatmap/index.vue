@@ -75,11 +75,8 @@ const fetchUnitList = async (pageNum = 1) => {
 };
 
 const handleRowClick = (row: any) => {
-  // 只需要更新响应式变量，RightMap 内部的 watch 会感知并触发高亮
   selectedUnit.value = {
-    WYM: row.WYM,
-    B102: row.B102,
-    B109: row.B109 
+    ...row
   };
 };
 

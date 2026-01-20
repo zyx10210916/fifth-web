@@ -37,58 +37,70 @@ export default {
       ]);
       mapModules.value = modules;
     };
-    // 高亮单位逻辑 (RightMap 独有)
-   // RightMap.vue
 
-const highlightUnit = async (unit) => {
-  if (!unit?.B109 || !mapView.value) return;
+    const highlightUnit = async (unit) => {
+  // 1. 验证坐标是否存在 (由 getUnitHeatMap 接口提供)
+  if (!unit || !unit.XZ_AXIS || !unit.YZ_AXIS || !mapView.value) return;
 
   try {
-    // 1. 依然先获取 Graphic 模块（这是必须的，用来创建容器）
-    // 如果你之前的代码是用 [Graphic] = mapModules.value 取的，这里也保持一致
     if (!mapModules.value) await loadEsriModules();
-    const [Graphic] = mapModules.value; 
+    const [Graphic] = mapModules.value;
 
-    // 2. 调用 MapView 暴露的查询接口
-    const features = await mapView.value.queryBuildingPoints(`B109 = '${unit.B109}'`);
-
-    // 3. 获取底层 View 实例
+    // 获取底层 MapView 实例
     const view = mapView.value.getMapView();
-    if (!view || !features?.length) return;
+    if (!view) return;
 
-    // 清除旧高亮
+    // 清除之前的高亮 Graphic
     if (highlightRef.value) {
       view.graphics.remove(highlightRef.value);
     }
 
-    // 4. 【核心修复】：直接使用对象字面量作为 symbol
-    // 不要用 new SimpleMarkerSymbol，直接把配置写在 symbol 属性里
-    // ArcGIS 会根据 type: "simple-marker" 自动找到对应的类
+    // 构建点几何对象
+    const pointGeometry = {
+      type: "point",
+      x: parseFloat(unit.XZ_AXIS),
+      y: parseFloat(unit.YZ_AXIS),
+      spatialReference: { wkid: 4526 }
+    };
+
+    // 创建红色高亮圆点 Graphic
     const highlightGraphic = new Graphic({
-      geometry: features[0].geometry,
+      geometry: pointGeometry,
       symbol: {
-        type: "simple-marker", // 靠这个字符串让底层的 Accessor 自动解析
+        type: "simple-marker",
         style: "circle",
-        color: [255, 0, 0, 0.9],
-        size: 14,
-        outline: { color: [255, 255, 255], width: 2 }
-      }
+        color: [255, 0, 0, 0.9], 
+        size: 10,
+        outline: { color: [255, 255, 255], width: 1 }
+      },
+      attributes: unit 
     });
 
-    // 5. 添加并定位
+    // 将高亮层添加到地图
     view.graphics.add(highlightGraphic);
     highlightRef.value = highlightGraphic;
 
+    // 执行飞行缩放 (flyTo 效果)
     await view.goTo({
-      target: features[0].geometry,
-      zoom: 15
-    }, { duration: 800 });
+      target: pointGeometry,
+      zoom: 17 
+    }, {
+      duration: 1200,  
+      easing: "ease-in-out"
+    });
 
-    // 如果你想保留之前的弹窗功能
+    // 定位完成后打开信息弹窗
     view.popup.open({
       title: unit.B102 || '单位信息',
-      content: `统一代码: ${unit.B109}`,
-      location: features[0].geometry
+      content: `
+        <div style="font-size:14px; line-height: 1.6;">
+          <p><b>统一社会信用代码:</b> ${unit.B109 || '-'}</p>
+          <p><b>主要业务活动:</b> ${unit.B1031 || '-'}</p>
+          <p><b>资产总计:</b> ${unit.ZCZJ || 0} 万元</p>
+          <p><b>地址:</b> ${unit.B1056 || '-'}</p>
+        </div>
+      `,
+      location: pointGeometry
     });
 
   } catch (error) {
