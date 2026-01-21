@@ -1,20 +1,32 @@
 <template>
-  <MapView ref="mapView" @map-select="handleMapSelect" @map-loaded="handleMapLoaded">
+  <MapView 
+    ref="mapView" 
+    :show-heatmap-option="true"
+    @map-select="handleMapSelect" 
+    @map-loaded="handleMapLoaded"
+    @building-loaded="handlePointsUpdate"
+    @heatmap-visible="val => isHeatmapVisible = val"
+  >
     <template #map-overlay>
-      <button @click="openHeatmapView" class="heatmap-view-btn">查看热力图</button>
+      <HeatmapView 
+        v-if="mapIsReady"
+        :view="mapInstance"
+        :modules="mapModules"
+        :points="currentWfsPoints"
+        :visible="isHeatmapVisible"
+      />
     </template>
   </MapView>
 </template>
 
 <script>
-import { ref, shallowRef, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { loadModules } from 'esri-loader'; // 确保引入了加载工具
+import { ref, shallowRef } from 'vue';
+import { loadModules } from 'esri-loader'; 
 import MapView from '../MapView.vue';
+import HeatmapView from './HeatmapView.vue';
 
 export default {
-  name: 'RightMap',
-  components: { MapView },
+  components: { MapView, HeatmapView },
   props: {
     selectedUnit: Object,
     filterParams: { type: Object, default: () => ({}) },
@@ -23,14 +35,16 @@ export default {
   emits: ['map-select'],
 
   setup(props, { emit }) {
-    const router = useRouter();
     const mapView = ref(null);
     const highlightRef = shallowRef(null);
+    const mapInstance = shallowRef(null);
     const mapModules = ref(null);
+    const mapIsReady = ref(false);
+    const isHeatmapVisible = ref(false);
+    const currentWfsPoints = ref([]);
 
-    // 加载高亮所需的 ArcGIS 模块
+
     const loadEsriModules = async () => {
-      // 建议传入与全局一致的配置
       const modules = await loadModules([
         'esri/Graphic',
         'esri/symbols/SimpleMarkerSymbol'
@@ -39,7 +53,6 @@ export default {
     };
 
     const highlightUnit = async (unit) => {
-  // 1. 验证坐标是否存在 (由 getUnitHeatMap 接口提供)
   if (!unit || !unit.XZ_AXIS || !unit.YZ_AXIS || !mapView.value) return;
 
   try {
@@ -108,19 +121,16 @@ export default {
   }
 };
 
-    const handleMapLoaded = async () => {
-      if (mapView.value) {
-        await mapView.value.fetchBuildingPoints(props.filterParams);
-      }
+    const handleMapLoaded = (payload) => {
+      mapInstance.value = payload.view;
+      mapModules.value = payload.modules;
+      mapIsReady.value = true;
+      // 初始加载
+      mapView.value.fetchBuildingPoints(props.filterParams);
     };
 
-    const openHeatmapView = () => {
-      // 通过暴露的 buildingLayer 获取数据
-      const data = mapView.value?.buildingLayer?.data;
-      if (data) {
-        sessionStorage.setItem('heatmapData', JSON.stringify(data));
-        router.push('/heatmap-view');
-      }
+    const handlePointsUpdate = (data) => {
+      currentWfsPoints.value = data || [];
     };
 
     const handleMapSelect = (codes) => emit('map-select', codes);
@@ -130,37 +140,24 @@ export default {
       if (mapView.value) mapView.value.fetchBuildingPoints(newParams);
     }, { deep: true });
 
-    // 监听选中项变化
     watch(() => props.selectedUnit, (unit) => {
       if (unit) {
-        // 【关键修复】：直接调用本地的 highlightUnit，不加 mapView.value
         highlightUnit(unit);
       }
     });
 
     return {
       mapView,
-      openHeatmapView,
-      handleMapSelect,
+      mapInstance,
+      mapModules,
+      mapIsReady,
+      currentWfsPoints,
+      isHeatmapVisible,
       handleMapLoaded,
-      highlightUnit // 暴露给外部（虽然目前是内部 watch 调用）
+      handlePointsUpdate,
+      handleMapSelect,
+      highlightUnit,
     };
   }
 };
 </script>
-
-<style lang="scss" scoped>
-.heatmap-view-btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 50;
-  padding: 8px 16px;
-  background: #ff5722;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-</style>

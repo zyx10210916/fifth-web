@@ -314,6 +314,7 @@ export default {
           }));
         });
 
+        console.log(`[统一查询模式] 选中记录: ${allSelectedWyms.length}, 渲染坐标点: ${coordinateMap.size}`);
       } catch (err) {
         console.error("MapTools 查询失败:", err);
       }

@@ -11,7 +11,7 @@
       <slot name="map-overlay"></slot>
 
       <BuildingLayer v-if="mapIsReady" ref="buildingLayerRef" :view="view" :modules="mapModules"
-        :visible="buildingLayerState.visible" @loaded="(data) => $emit('building-points-loaded', data)" />
+        :visible="buildingLayerState.visible" @loaded="(data) => $emit('building-loaded', data)" />
 
       <ul class="mapType">
         <li v-for="item in mapList" :key="item.id" @click="handleBasemapChange(item.id)"
@@ -35,13 +35,13 @@
             <input type="checkbox" id="building" v-model="buildingLayerState.visible" class="tree-checkbox">
             <label for="building" class="tree-label">企业建筑点</label>
           </div>
+          <div v-if="showHeatmapOption" class="tree-node">
+            <input type="checkbox" id="heatmap" v-model="heatmapVisible" @change="$emit('heatmap-visible', heatmapVisible)" class="tree-checkbox">
+            <label for="heatmap" class="tree-label">企业热力图</label>
+          </div>
           <div class="tree-node">
-            <input type="checkbox" id="house" v-model="houseLayer.visible" @change="updateLayerVisibility(houseLayer)"
-              class="tree-checkbox">
-            <label for="house" class="tree-label">
-              企业房屋面
-              <span v-if="houseLayer.isFetching">(加载中...)</span>
-            </label>
+            <input type="checkbox" id="house" v-model="houseLayer.visible" @change="updateLayerVisibility(houseLayer)" class="tree-checkbox">
+            <label for="house" class="tree-label">企业房屋面<span v-if="houseLayer.isFetching">(加载中...)</span></label>
           </div>
 
           <div class="tree-node tree-group"><label>基础地理数据</label></div>
@@ -79,15 +79,17 @@ export default {
     boundaryLayersConfig: { type: Object, default: () => MAP_CONFIG.boundary.layers },
     boundaryBaseUrl: { type: String, default: MAP_CONFIG.boundary.baseUrl },
     houseLayerUrl: { type: String, default: MAP_CONFIG.economic.houseUrl },
-    appendMode: { type: Boolean, default: false }
+    appendMode: { type: Boolean, default: false },
+    showHeatmapOption: { type: Boolean, default: false }
   },
-  emits: ['map-select', 'map-loaded', 'building-points-loaded', 'house-layer-loaded'],
+  emits: ['map-select', 'map-loaded', 'building-loaded', 'house-loaded', 'heatmap-visible'],
 
   setup(props, { emit, expose }) {
     const view = shallowRef(null);
     const mapModules = shallowRef(null);
     const mapIsReady = ref(false);
     const buildingLayerRef = ref(null);
+    const heatmapVisible = ref(false);
     const panelVisible = ref(true);
     const basemapVisible = ref(true);
     const mapList = MAP_CONFIG.basemapUI;
@@ -363,21 +365,19 @@ export default {
     });
 
     return {
-      view, mapModules, mapIsReady, buildingLayerRef, buildingLayerState,
-      panelVisible, boundaryLayers, houseLayer, mapList: MAP_CONFIG.basemapUI,
+      view, mapModules, mapIsReady, buildingLayerRef, buildingLayerState, heatmapVisible,
+      panelVisible, boundaryLayers, houseLayer, mapList: MAP_CONFIG.basemapUI, mapToolsRef,
       activeBasemapId, basemapVisible, togglePanel: () => panelVisible.value = !panelVisible.value,
+      updateLayerVisibility,clearMapTools,
       handleBasemapChange: (id) => { /* 底图切换逻辑 */ },
-      updateLayerVisibility,
-      updateBasemapVisibility: () => {
-        view.value.map.basemap.baseLayers.forEach(lyr => lyr.visible = basemapVisible.value);
-      },
       handleMapSelection: (codes) => emit('map-select', codes),
       fetchBuildingPoints: (p) => buildingLayerRef.value?.fetchBuildingPoints(p),
       loadBuildingPoints: (d) => buildingLayerRef.value?.loadBuildingPoints(d),
       queryBuildingPoints: (c) => buildingLayerRef.value?.queryBuildingPoints(c),
       getMapView: () => view.value,
-      mapToolsRef,
-      clearMapTools
+      updateBasemapVisibility: () => {
+        view.value.map.basemap.baseLayers.forEach(lyr => lyr.visible = basemapVisible.value);
+      },
     };
   }
 };
