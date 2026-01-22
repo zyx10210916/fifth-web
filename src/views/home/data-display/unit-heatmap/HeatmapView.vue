@@ -19,7 +19,7 @@ import { ref, watch, onUnmounted, shallowRef } from 'vue';
 export default {
   name: 'HeatmapLayerManager',
   props: {
-    view: Object,      // ArcGIS View 实例 
+    view: Object,      // ArcGIS View 实例
     modules: Array,    // ArcGIS 模块数组
     points: Array,     // WFS 请求回来的当前视图点数据
     visible: Boolean   // 目录树控制的显隐
@@ -40,7 +40,7 @@ export default {
     const getRenderer = (field) => {
       let maxIntensity = 100;
       if (field === 'QMRS') {
-        maxIntensity = 1000;
+        maxIntensity = 100000;
       } else if (field) {
         maxIntensity = 500000;
       }

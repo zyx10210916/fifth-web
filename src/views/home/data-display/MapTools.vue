@@ -238,6 +238,9 @@ export default {
     };
 
     // 高亮选中及发送查询逻辑
+
+    // data-display/MapTools.vue
+
     const querySelectedPoints = async (geometry) => {
       const bldCfg = MAP_CONFIG.economic.building;
       const buildingLayer = props.view.map.findLayerById(bldCfg.id);
@@ -273,7 +276,7 @@ export default {
             recordCount++;
 
             // --- 核心修改：解析“坐标”属性字段 ---
-            // 假设字段名为 "坐标"，格式为 "x,y"
+            // 字段名为 "坐标"，格式为 "x,y"
             const coordStr = f.properties["坐标"] || "";
             if (coordStr && coordStr.includes(',')) {
               const [zx, yx] = coordStr.split(',');

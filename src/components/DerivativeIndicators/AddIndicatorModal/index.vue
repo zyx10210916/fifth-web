@@ -86,28 +86,28 @@
       </a-form-item>
 
       <!-- 汇总公式部分 -->
-      <div class="summary-formula-container">
-        <div class="checkbox-container">
-          <a-checkbox v-model:checked="formState.useDifferentFormula">
-            <span class="checkbox-text">汇总时用不同公式</span>
-          </a-checkbox>
-          <span class="formula-editor-label" @click="handleSummaryFormulaEditorClick">公式编辑器</span>
-        </div>
+<!--      <div class="summary-formula-container">-->
+<!--        <div class="checkbox-container">-->
+<!--          <a-checkbox v-model:checked="formState.useDifferentFormula">-->
+<!--            <span class="checkbox-text">汇总时用不同公式</span>-->
+<!--          </a-checkbox>-->
+<!--          <span class="formula-editor-label" @click="handleSummaryFormulaEditorClick">公式编辑器</span>-->
+<!--        </div>-->
 
-        <a-form-item
-            v-if="formState.useDifferentFormula"
-            name="summaryFormula"
-            :rules="formState.useDifferentFormula ? [{ required: true, message: '请输入汇总公式' }] : []"
-            class="summary-form-item"
-        >
-          <a-textarea
-              v-model:value="formState.summaryFormula"
-              placeholder="请输入汇总单独处理公式"
-              :rows="3"
-              class="form-textarea"
-          />
-        </a-form-item>
-      </div>
+<!--        <a-form-item-->
+<!--            v-if="formState.useDifferentFormula"-->
+<!--            name="summaryFormula"-->
+<!--            :rules="formState.useDifferentFormula ? [{ required: true, message: '请输入汇总公式' }] : []"-->
+<!--            class="summary-form-item"-->
+<!--        >-->
+<!--          <a-textarea-->
+<!--              v-model:value="formState.summaryFormula"-->
+<!--              placeholder="请输入汇总单独处理公式"-->
+<!--              :rows="3"-->
+<!--              class="form-textarea"-->
+<!--          />-->
+<!--        </a-form-item>-->
+<!--      </div>-->
 
       <!-- 归属报表和标签 -->
       <div class="form-row">

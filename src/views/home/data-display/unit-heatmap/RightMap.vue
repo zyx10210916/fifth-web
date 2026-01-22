@@ -118,7 +118,7 @@ export default {
       currentWfsPoints.value = data || [];
     };
 
-   const handleMapSelect = (payload) => {
+     const handleMapSelect = (payload) => {
       emit('map-select', payload); 
     };
  

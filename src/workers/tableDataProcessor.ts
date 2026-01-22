@@ -59,8 +59,8 @@ function processTableDataIncrementally(resDataList: any[], options: {
 } = {}): void {
   // 更保守的默认参数
   const {
-    chunkSize = 100,  // 更小的块大小
-    batchSize = 25    // 更小的批次
+    chunkSize = 600,  // 更小的块大小
+    batchSize = 50   // 更小的批次
   } = options;
 
   const processedTables: any[][] = [];

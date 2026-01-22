@@ -235,27 +235,63 @@ const isClickOutsideReport = ref(false);
 // 添加选中的报表和指标数据
 const selectedReport = ref(null);
 const selectedIndicators = ref([]);
+// 新增：收集所有使用过的原始表号数据
+const usedOriginalTableCodes = ref(new Set());
 
 // 处理报表点击事件
-const handleReportClick = async (report) => { if (!report || !report.TABLE_NAME) { console.error('报表数据不完整，缺少表名（TABLE_NAME）');
-  return; } selectedReport.value = report; indicatorData.value = [];
+const handleReportClick = async (report) => {
+  if (!report || !report.TABLE_NAME) {
+    console.error('报表数据不完整，缺少表名（TABLE_NAME）');
+    return;
+  }
+
+  selectedReport.value = report; indicatorData.value = [];
   // 清空旧数据
   try {
     const response = await indexGetData(
-        { pageNo: 1, pageSize: 1000, sortField: '', sortOrder: "asc",
+        { pageNo: 1,
+          pageSize: 1000,
+          sortField: '',
+          sortOrder: "asc",
           params:
               { Q_TABLE_CODE_S_LK: report.TABLE_CODE } });
     console.log(report.TABLE_CODE)
     if (response)
     {
       console.log(response)
-      indicatorData.value = response.data;
+      if (response.data.length != 0){
+        indicatorData.value = response.data;
+      }else {
+        const response2 = await indexGetData(
+            { pageNo: 1,
+              pageSize: 1000,
+              sortField: '',
+              sortOrder: "asc",
+              params: {
+                Q_TABLE_NUM_S_LK: report.TABLE_CODE
+              } });
+        if (response2) {
+          console.log(response2)
+          indicatorData.value = response2.data;
+          console.log('根据表名查询到的指标数据:', indicatorData.value);
+        }else {
+          console.error('获取指标数据失败:', response?.message || '接口返回异常');
+        }
+      }
+
       console.log('根据表名查询到的指标数据:', indicatorData.value);
-    }
-    else { console.error('获取指标数据失败:', response?.message || '接口返回异常');
+    } else {
+      console.error('获取指标数据失败:', response?.message || '接口返回异常');
     }
   }
   catch (error) { console.error('请求指标接口出错:', error); } };
+
+// 处理表号，移除连字符
+const processTableCode = (tableCode) => {
+  if (!tableCode) return '';
+  // 将表号中的连字符移除，如611-1 -> 6111，B611-1 -> B6111
+  return tableCode.replace(/-/g, '');
+};
 
 // 处理指标点击事件
 const handleIndicatorClick = (indicator) => {
@@ -271,9 +307,14 @@ const handleIndicatorClick = (indicator) => {
   const cursorPosition = textarea.selectionStart;
   const currentValue = formulaText.value;
 
-  // 关键修改：使用表号而不是表名（格式：表号.指标名）
+  // 关键修改：使用表号而不是表名（格式：表号.指标名），并移除连字符
   const tableCode = selectedReport.value?.TABLE_NUM || '';
-  const fullIndicatorName = tableCode ? `${tableCode}.${indicator.COLUMN_NAME}` : indicator.COLUMN_NAME;
+  // 收集原始表号数据
+  if (tableCode) {
+    usedOriginalTableCodes.value.add(tableCode);
+  }
+  const processedTableCode = processTableCode(tableCode);
+  const fullIndicatorName = processedTableCode ? `${processedTableCode}.${indicator.COLUMN_NAME}` : indicator.COLUMN_NAME;
 
   // 在光标位置插入带表号的指标代码
   formulaText.value =
@@ -454,9 +495,14 @@ const insertAtPlaceholder = () => {
       const beforePlaceholder = currentValue.substring(0, placeholderStart);
       const afterPlaceholder = currentValue.substring(placeholderStart + 6); // +6 是 '{xxxx}' 的长度
 
-      // 关键修改：使用表号而不是表名（格式：表号.指标名）
+      // 关键修改：使用表号而不是表名（格式：表号.指标名），并移除连字符
       const tableCode = selectedReport.value?.TABLE_NUM || '';
-      const fullIndicatorName = tableCode ? `${tableCode}.${lastClickedIndicator.value.COLUMN_NAME}` : lastClickedIndicator.value.COLUMN_NAME;
+      // 收集原始表号数据
+      if (tableCode) {
+        usedOriginalTableCodes.value.add(tableCode);
+      }
+      const processedTableCode = processTableCode(tableCode);
+      const fullIndicatorName = processedTableCode ? `${processedTableCode}.${lastClickedIndicator.value.COLUMN_NAME}` : lastClickedIndicator.value.COLUMN_NAME;
 
       formulaText.value = beforePlaceholder + fullIndicatorName + afterPlaceholder;
 
@@ -726,20 +772,38 @@ const loadReportData = async (pageNo = 1, pageSize = 10) => {
     const response = await buniscGetData({
       pageNo,
       pageSize,
-      sortField: "TABLE_NAME",
+      sortField: "",
       sortOrder: "asc",
-      params: reportSearchQuery.value
-          ? { Q_TABLE_NAME_S_LK: reportSearchQuery.value }
-          : {}
+      params:
+          { Q_TABLE_NAME_S_LK: reportSearchQuery.value }
     });
 
     if (response) {
-      console.log(response)
-      reportData.value = response.data.map((item, index) => ({
-        ...item,
-        serialNumber: (pageNo - 1) * pageSize + index + 1
-      }));
-      pagination.value.total = response.totalCount;
+      if (response.data.length != 0){
+        console.log(response)
+        reportData.value = response.data.map((item, index) => ({
+          ...item,
+          serialNumber: (pageNo - 1) * pageSize + index + 1
+        }));
+        pagination.value.total = response.totalCount;
+      }else {
+        const res = await buniscGetData({
+          pageNo,
+          pageSize,
+          sortField: "",
+          sortOrder: "asc",
+          params:  { Q_TABLE_NUM_S_LK: reportSearchQuery.value}
+        });
+        if (res){
+          console.log(res)
+          reportData.value = res.data.map((item, index) => ({
+            ...item,
+            serialNumber: (pageNo - 1) * pageSize + index + 1
+          }));
+          pagination.value.total = res.totalCount;
+        }
+
+      }
     }
   } catch (error) {
     console.error('获取报表数据出错:', error);
@@ -833,190 +897,145 @@ defineExpose({
 });
 </script>
 <template>
-  <div class="flex-col justify-start items-start relative page" ref="containerRef">
-    <div class="section_11"></div>
-    <div class="flex-col section pos">
-      <div class="flex-row justify-center relative section_2">
-        <div class="flex-row items-center pos_2" @click="handleBackClick">
-          <img class="shrink-0 image" src="../../assets/images/5f98434fc06fa50e59f5a548bf6d250d.png" />
-          <span class="font_2 text_3" style="cursor: pointer">返回</span>
-          <span class="font text">设置汇总口径</span>
+  <div class="flex-col justify-start items-start relative page equation-editor-container" ref="containerRef">
+    <div class="editor-content">
+      <div class="section_11"></div>
+      <div class="flex-col section pos">
+        <div class="flex-row justify-center relative section_2">
+          <div class="flex-row items-center pos_2" @click="handleBackClick">
+            <img class="shrink-0 image" src="/src/assets/images/5f98434fc06fa50e59f5a548bf6d250d.png" />
+            <span class="font_2 text_3" style="cursor: pointer">返回</span>
+            <span class="font text">设置衍生指标</span>
+          </div>
+
         </div>
-
-      </div>
-      <div class="flex-row items-center group">
-        <div class="flex-col shrink-0 section_3" ref="leftPanelRef">
-          <div class="flex-row self-stretch group_4" @click="toggleOperators">
-            <span class="font text_4">常用运算符</span>
-            <img class="shrink-0 image ml-184 transition-transform duration-300"
-                 :class="{ 'rotate-180': showOperators }"
-                 src="../../assets/images/061f910a423ed5b571cdb54d8fce4319.png" style="cursor: pointer"/>
-          </div>
-          <transition name="slide-down">
-            <div v-if="showOperators" class="flex-col self-stretch group_5">
-              <div class="flex-row">
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('+')">
-                  <span class="font_6 text_8" style="width: 30px">+加</span>
-                </div>
-
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('-')">
-                  <span class="font_6 text_8" style="width: 30px">-减</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('*')">
-                  <span class="font_6 text_8" style="width: 30px">*乘</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('/')">
-                  <span class="font_6 text_8" style="width: 50px">÷除</span>
-                </div>
-
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('=')">
-                  <span class="font_6 text_8" style="width: 50px">=赋值</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('>')">
-                  <span class="font_6 text_8" style="width: 50px">＞大于</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('<')">
-                  <span class="font_6 text_8" style="width: 50px">＜小于</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('>=')">
-                  <span class="font_6 text_8" style="width: 80px">≥大于等于</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('(')">
-                  <span class="font_6 text_8" style="width: 50px">(左括号</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick(')')">
-                  <span class="font_6 text_8" style="width: 50px">)右括号</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('<=')">
-                  <span class="font_6 text_8" style="width: 80px"><=小于等于</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('!=')">
-                  <span class="font_6 text_8" style="width: 80px">!=不等于</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('|')">
-                  <span class="font_6 text_8" style="width: 50px">||或者</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('&')">
-                  <span class="font_6 text_8" style="width: 80px">&&并且</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('like_prefix')">
-                  <span class="font_6 text_8" style="width: 50px;cursor: pointer">前缀</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('not_like_prefix')">
-                  <span class="font_6 text_8" style="width: 50px;cursor: pointer">非前缀</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('like_suffix')">
-                  <span class="font_6 text_8" style="width: 50px;cursor: pointer">后缀</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('not_like_suffix')">
-                  <span class="font_6 text_8" style="width: 50px;cursor: pointer">非后缀</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-
-                <div class="flex-col justify-start items-center relative text-wrapper_29 ml-9" @click="() => handleOperatorClick('like_contains')">
-                  <span class="font_12 text_22 text_55" style="cursor: pointer">包含</span>
-                </div>
-                <div class="flex-col justify-start items-center text-wrapper_30 ml-9" @click="() => handleOperatorClick('not_like_contains')">
-                  <span class="font_12 text_22 text_56" style="cursor: pointer">不包含</span>
-                </div>
-                <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('is_empty')">
-                  <span class="font_6 text_8" style="width: 50px;cursor: pointer">为空</span>
-                </div>
-              </div>
-              <div class="flex-row mt-12">
-
-                <div class="flex-col justify-start items-center text-wrapper_32 ml-9" @click="() => handleOperatorClick('is_not_empty')">
-                  <span class="font_12 text_22 text_62" style="cursor: pointer">非空</span>
-                </div>
-              </div>
+        <div class="flex-row items-center group">
+          <div class="flex-col shrink-0 section_3" ref="leftPanelRef">
+            <div class="flex-row self-stretch group_4" @click="toggleOperators">
+              <span class="font text_4">常用运算符</span>
+              <img class="shrink-0 image ml-184 transition-transform duration-300"
+                   :class="{ 'rotate-180': showOperators }"
+                   src="/src/assets/images/061f910a423ed5b571cdb54d8fce4319.png" style="cursor: pointer"/>
             </div>
-          </transition>
-          <div class="flex-row self-stretch view_5">
-            <span class="font text_68">其他运算符、函数、控制语句</span>
-          </div>
-          <span class="self-start text_70">查看函数说明示例</span>
-          <div class="flex-col justify-start items-start self-stretch view_6">
-            <div class="flex-row group_18">
-              <div class="flex-col self-start group_14">
-                <span class="self-start font_4 text_73">通用函数</span>
-                <span class="self-start font_13 text_76 mt-17" @click="() => handleOperatorClick('or')" style="cursor: pointer">或者OR</span>
-                <span class="self-start font_13 text_76 mt-17" @click="() => handleOperatorClick('and')" style="cursor: pointer">并且AND</span>
+            <transition name="slide-down">
+              <div v-if="showOperators" class="flex-col self-stretch group_5">
+                <div class="flex-row">
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('+')">
+                    <span class="font_6 text_8" style="width: 30px">+加</span>
+                  </div>
 
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="flex-col flex-1 ml-31">
-          <!-- 表格区域容器 -->
-          <div class="flex-row gap-6" >
-            <!-- 报表部分 -->
-            <div class="flex-col flex-1" style="display: flex; flex-direction: column; min-height: 0;">
-              <div class="flex-row justify-between items-center group_2 mb-5">
-                <span class="font_3">报表</span>
-                <div class="flex-row items-center">
-                  <div class="flex-row shrink-0 group_1">
-                    <div class="flex-col justify-start items-start text-wrapper">
-                      <input v-model="reportSearchQuery" class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                             placeholder="请输入表名"
-                             @input="handleReportInputChange"
-                      />
-                    </div>
-                    <a-button type="primary" class="search-button" @click="handleReportSearch">
-                      <template #icon><SearchOutlined /></template>
-                      搜索
-                    </a-button>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('-')">
+                    <span class="font_6 text_8" style="width: 30px">-减</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('*')">
+                    <span class="font_6 text_8" style="width: 30px">*乘</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('/')">
+                    <span class="font_6 text_8" style="width: 50px">÷除</span>
+                  </div>
+
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('=')">
+                    <span class="font_6 text_8" style="width: 50px">=赋值</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('>')">
+                    <span class="font_6 text_8" style="width: 50px">＞大于</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('<')">
+                    <span class="font_6 text_8" style="width: 50px">＜小于</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('>=')">
+                    <span class="font_6 text_8" style="width: 80px">≥大于等于</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('(')">
+                    <span class="font_6 text_8" style="width: 50px">(左括号</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick(')')">
+                    <span class="font_6 text_8" style="width: 50px">)右括号</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('<=')">
+                    <span class="font_6 text_8" style="width: 80px"><=小于等于</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('!=')">
+                    <span class="font_6 text_8" style="width: 80px">!=不等于</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('|')">
+                    <span class="font_6 text_8" style="width: 50px">||或者</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('&')">
+                    <span class="font_6 text_8" style="width: 80px">&&并且</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('like_prefix')">
+                    <span class="font_6 text_8" style="width: 50px;cursor: pointer">前缀</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('not_like_prefix')">
+                    <span class="font_6 text_8" style="width: 50px;cursor: pointer">非前缀</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('like_suffix')">
+                    <span class="font_6 text_8" style="width: 50px;cursor: pointer">后缀</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('not_like_suffix')">
+                    <span class="font_6 text_8" style="width: 50px;cursor: pointer">非后缀</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+
+                  <div class="flex-col justify-start items-center relative text-wrapper_29 ml-9" @click="() => handleOperatorClick('like_contains')">
+                    <span class="font_12 text_22 text_55" style="cursor: pointer">包含</span>
+                  </div>
+                  <div class="flex-col justify-start items-center text-wrapper_30 ml-9" @click="() => handleOperatorClick('not_like_contains')">
+                    <span class="font_12 text_22 text_56" style="cursor: pointer">不包含</span>
+                  </div>
+                  <div class="flex-col justify-start items-center shrink-0 relative text-wrapper_3 ml-9" @click="() => handleOperatorClick('is_empty')">
+                    <span class="font_6 text_8" style="width: 50px;cursor: pointer">为空</span>
+                  </div>
+                </div>
+                <div class="flex-row mt-12">
+
+                  <div class="flex-col justify-start items-center text-wrapper_32 ml-9" @click="() => handleOperatorClick('is_not_empty')">
+                    <span class="font_12 text_22 text_62" style="cursor: pointer">非空</span>
                   </div>
                 </div>
               </div>
+            </transition>
+            <div class="flex-row self-stretch view_5">
+              <span class="font text_68">其他运算符、函数、控制语句</span>
+            </div>
+            <span class="self-start text_70">查看函数说明示例</span>
+            <div class="flex-col justify-start items-start self-stretch view_6">
+              <div class="flex-row group_18">
+                <div class="flex-col self-start group_14">
+                  <span class="self-start font_4 text_73">通用函数</span>
+                  <span class="self-start font_13 text_76 mt-17" @click="() => handleOperatorClick('or')" style="cursor: pointer">或者OR</span>
+                  <span class="self-start font_13 text_76 mt-17" @click="() => handleOperatorClick('and')" style="cursor: pointer">并且AND</span>
 
-              <div class="table-container report-table-container">
-                <a-table
-                    :columns="reportColumns"
-                    :data-source="paginatedReportData"
-                    :pagination="false"
-                    bordered
-                    size="small"
-                    :customRow="customRowHandler"
-                />
-              </div>
-
-              <!-- Ant Design Vue 分页组件 -->
-              <div class="pagination mt-4">
-                <a-pagination
-                    v-model:current="pagination.current"
-                    v-model:pageSize="pagination.pageSize"
-                    :pageSizeOptions="pagination.pageSizeOptions"
-                    :showSizeChanger="pagination.showSizeChanger"
-                    :showQuickJumper="pagination.showQuickJumper"
-                    :showTotal="pagination.showTotal"
-                    :total="pagination.total"
-                    :locale="pagination.locale"
-                    @change="handlePaginationChange"
-                    @showSizeChange="handlePaginationChange"
-                />
+                </div>
               </div>
             </div>
-            <!-- 指标部分 -->
-            <div class="flex-col flex-1" style="display: flex; flex-direction: column; min-height: 0;">
-              <div class="zhibiao" style="border-left: 1px solid #e8e8e8;padding: 5px">
-                <!-- 指标标题和搜索 -->
+          </div>
+          <div class="flex-col flex-1 ml-31">
+            <!-- 表格区域容器 -->
+            <div class="flex-row gap-6" >
+              <!-- 报表部分 -->
+              <div class="flex-col flex-1" style="display: flex; flex-direction: column; min-height: 0;">
                 <div class="flex-row justify-between items-center group_2 mb-5">
-                  <span class="font_3">指标</span>
+                  <span class="font_3">报表</span>
                   <div class="flex-row items-center">
                     <div class="flex-row shrink-0 group_1">
                       <div class="flex-col justify-start items-start text-wrapper">
-                        <input v-model="indicatorSearchQuery" class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入搜索内容" />
+                        <input v-model="reportSearchQuery" class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="请输入表名/表号"
+                               @input="handleReportInputChange"
+                        />
                       </div>
                       <a-button type="primary" class="search-button" @click="handleReportSearch">
                         <template #icon><SearchOutlined /></template>
@@ -1026,60 +1045,106 @@ defineExpose({
                   </div>
                 </div>
 
-                <!--                &lt;!&ndash; 测试1行 - 放置在表格上方 &ndash;&gt;-->
-                <!--                <div class="test-row-container mb-3 p-2 border border-gray-200 rounded-md bg-gray-50">-->
-                <!--                  <div class="editable-row">-->
-                <!--                    <input v-if="isEditingTestRow" type="text" v-model="testRowName" class="edit-input" @blur="saveTestRow" @keyup.enter="saveTestRow">-->
-                <!--                    <span v-else class="test-row-name">测试1</span>-->
-                <!--                    <span class="edit-icon" @click="toggleTestRowEdit">✏️</span>-->
-                <!--                  </div>-->
-                <!--                </div>-->
+                <div class="table-container report-table-container">
+                  <a-table
+                      :columns="reportColumns"
+                      :data-source="paginatedReportData"
+                      :pagination="false"
+                      bordered
+                      size="small"
+                      :customRow="customRowHandler"
+                  />
+                </div>
 
-                <!-- 表格和控制区域容器 -->
-                <div class="table-with-controls-container">
-                  <!-- 表格容器 -->
-                  <div class="table-container indicator-table-container" @scroll="handleScroll">
-                    <table class="report-table">
-                      <thead>
-                      <tr>
-                        <th class="small-header">
-                          <span class="column-name-small">所有列</span>
-                        </th>
-                      </tr>
-                      </thead>
-                      <tbody>
-                      <template v-for="group in groupedIndicatorData" :key="group.letter">
-                        <!-- 字母分组行 -->
-                        <tr class="alphabet-group-header" :id="`letter-${group.letter}`" :data-letter="group.letter"  v-if="panelSortStates.mainIndicator">
-                          <td class="alphabet-group-cell">{{ group.letter }}</td>
-                        </tr>
-                        <!-- 指标数据行 -->
-                        <tr v-for="item in group.items" :key="item.id" @click="() => handleIndicatorClick(item)">
-                          <td>{{ item.COLUMN_NAME  }}</td>
-                        </tr>
-                      </template>
-                      <!-- 当没有数据时显示 -->
-                      <tr v-if="groupedIndicatorData.length === 0">
-                        <td class="no-data">暂无数据</td>
-                      </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <!-- 右侧控制区域 - 竖直排列 -->
-                  <div class="right-controls-vertical">
-                    <!-- 排序按钮 -->
-                    <div class="sort-control" @click="toggleIndicatorSort('mainIndicator')" :class="{ 'active': panelSortStates.mainIndicator }" :title="panelSortStates.mainIndicator ? '排序已开启' : '排序已关闭'">
-                      <span>字符索引</span>
-                      <div class="toggle-switch">
-                        <div class="toggle-switch-track"></div>
-                        <div class="toggle-switch-thumb"></div>
+                <!-- Ant Design Vue 分页组件 -->
+                <div class="pagination mt-4">
+                  <a-pagination
+                      v-model:current="pagination.current"
+                      v-model:pageSize="pagination.pageSize"
+                      :pageSizeOptions="pagination.pageSizeOptions"
+                      :showSizeChanger="pagination.showSizeChanger"
+                      :showQuickJumper="pagination.showQuickJumper"
+                      :showTotal="pagination.showTotal"
+                      :total="pagination.total"
+                      :locale="pagination.locale"
+                      @change="handlePaginationChange"
+                      @showSizeChange="handlePaginationChange"
+                  />
+                </div>
+              </div>
+              <!-- 指标部分 -->
+              <div class="flex-col flex-1" style="display: flex; flex-direction: column; min-height: 0;">
+                <div class="zhibiao" style="border-left: 1px solid #e8e8e8;padding: 5px">
+                  <!-- 指标标题和搜索 -->
+                  <div class="flex-row justify-between items-center group_2 mb-5">
+                    <span class="font_3">指标</span>
+                    <div class="flex-row items-center">
+                      <div class="flex-row shrink-0 group_1">
+                        <div class="flex-col justify-start items-start text-wrapper">
+                          <input v-model="indicatorSearchQuery" class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入搜索内容" />
+                        </div>
+                        <a-button type="primary" class="search-button" @click="handleReportSearch">
+                          <template #icon><SearchOutlined /></template>
+                          搜索
+                        </a-button>
                       </div>
                     </div>
+                  </div>
 
-                    <!-- 字母索引 -->
-                    <div class="alphabet-index-vertical" v-if="panelSortStates.mainIndicator && availableLetters.length > 0 ">
-                      <div class="alphabet-letters-vertical">
+                  <!--                &lt;!&ndash; 测试1行 - 放置在表格上方 &ndash;&gt;-->
+                  <!--                <div class="test-row-container mb-3 p-2 border border-gray-200 rounded-md bg-gray-50">-->
+                  <!--                  <div class="editable-row">-->
+                  <!--                    <input v-if="isEditingTestRow" type="text" v-model="testRowName" class="edit-input" @blur="saveTestRow" @keyup.enter="saveTestRow">-->
+                  <!--                    <span v-else class="test-row-name">测试1</span>-->
+                  <!--                    <span class="edit-icon" @click="toggleTestRowEdit">✏️</span>-->
+                  <!--                  </div>-->
+                  <!--                </div>-->
+
+                  <!-- 表格和控制区域容器 -->
+                  <div class="table-with-controls-container">
+                    <!-- 表格容器 -->
+                    <div class="table-container indicator-table-container" @scroll="handleScroll">
+                      <table class="report-table">
+                        <thead>
+                        <tr>
+                          <th class="small-header">
+                            <span class="column-name-small">所有列</span>
+                          </th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <template v-for="group in groupedIndicatorData" :key="group.letter">
+                          <!-- 字母分组行 -->
+                          <tr class="alphabet-group-header" :id="`letter-${group.letter}`" :data-letter="group.letter"  v-if="panelSortStates.mainIndicator">
+                            <td class="alphabet-group-cell">{{ group.letter }}</td>
+                          </tr>
+                          <!-- 指标数据行 -->
+                          <tr v-for="item in group.items" :key="item.id" @click="() => handleIndicatorClick(item)">
+                            <td>{{ item.COLUMN_NAME  }}</td>
+                          </tr>
+                        </template>
+                        <!-- 当没有数据时显示 -->
+                        <tr v-if="groupedIndicatorData.length === 0">
+                          <td class="no-data">暂无数据</td>
+                        </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <!-- 右侧控制区域 - 竖直排列 -->
+                    <div class="right-controls-vertical">
+                      <!-- 排序按钮 -->
+                      <div class="sort-control" @click="toggleIndicatorSort('mainIndicator')" :class="{ 'active': panelSortStates.mainIndicator }" :title="panelSortStates.mainIndicator ? '排序已开启' : '排序已关闭'">
+                        <span>字符索引</span>
+                        <div class="toggle-switch">
+                          <div class="toggle-switch-track"></div>
+                          <div class="toggle-switch-thumb"></div>
+                        </div>
+                      </div>
+
+                      <!-- 字母索引 -->
+                      <div class="alphabet-index-vertical" v-if="panelSortStates.mainIndicator && availableLetters.length > 0 ">
+                        <div class="alphabet-letters-vertical">
                     <span class="alphabet-letter"
                           v-for="letter in mainAvailableLetters"
                           :key="letter"
@@ -1087,82 +1152,82 @@ defineExpose({
                           :class="{ 'selected': panelCurrentLetters.mainIndicator === letter}">
                       {{ letter }}
                     </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div style=" border-left: 1px solid #e8e8e8;border-top: 1px solid #e8e8e8;border-bottom: 1px solid #e8e8e8;padding: 5px">
-                <!-- 指标标题和搜索 -->
-                <div class="flex-row justify-between items-center group_2 mb-5" >
-                  <span class="font_3">衍生指标</span>
-                  <div class="flex-row items-center">
-                    <div class="flex-row shrink-0 group_1">
-                      <div class="flex-col justify-start items-start text-wrapper">
-                        <input class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入搜索内容" />
-                      </div>
-                      <a-button type="primary" class="search-button" @click="handleReportSearch">
-                        <template #icon><SearchOutlined /></template>
-                        搜索
-                      </a-button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 测试1行 - 放置在表格上方 -->
-                <!--                <div class="test-row-container mb-3 p-2 border border-gray-200 rounded-md bg-gray-50">-->
-                <!--                  <div class="editable-row">-->
-                <!--                    <input v-if="isEditingTestRow" type="text" v-model="testRowName" class="edit-input" @blur="saveTestRow" @keyup.enter="saveTestRow">-->
-                <!--                    <span v-else class="test-row-name">测试1</span>-->
-                <!--                    <span class="edit-icon" @click="toggleTestRowEdit">✏️</span>-->
-                <!--                  </div>-->
-                <!--                </div>-->
-
-                <!-- 表格和控制区域容器 -->
-                <div class="table-with-controls-container">
-                  <!-- 表格容器 -->
-                  <div class="table-container indicator-table-container" @scroll="handleScroll">
-                    <table class="report-table">
-                      <thead>
-                      <tr>
-                        <th class="small-header">
-                          <span class="column-name-small">所有列</span>
-                        </th>
-                      </tr>
-                      </thead>
-                      <tbody>
-                      <template v-for="group in groupedDerivedIndicatorData" :key="group.letter">
-                        <!-- 字母分组行 -->
-                        <tr class="alphabet-group-header" :id="`letter-${group.letter}`" :data-letter="group.letter" v-if="panelSortStates.derivedIndicator">
-                          <td class="alphabet-group-cell">{{ group.letter }}</td>
-                        </tr>
-                        <!-- 指标数据行 -->
-                        <tr v-for="item in group.items" :key="item.id" @click="() => handleIndicatorClick(item)">
-                          <td>{{ item.name }}</td>
-                        </tr>
-                      </template>
-                      <!-- 当没有数据时显示 -->
-                      <tr v-if="groupedDerivedIndicatorData.length === 0">
-                        <td class="no-data">暂无数据</td>
-                      </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <!-- 右侧控制区域 - 竖直排列 -->
-                  <div class="right-controls-vertical">
-                    <!-- 排序按钮 -->
-                    <div class="sort-control" @click="toggleIndicatorSort('derivedIndicator')" :class="{ 'active': panelSortStates.derivedIndicator }" :title="panelSortStates.derivedIndicator ? '排序已开启' : '排序已关闭'">
-                      <span>字符索引</span>
-                      <div class="toggle-switch">
-                        <div class="toggle-switch-track"></div>
-                        <div class="toggle-switch-thumb"></div>
+                <div style=" border-left: 1px solid #e8e8e8;border-top: 1px solid #e8e8e8;border-bottom: 1px solid #e8e8e8;padding: 5px">
+                  <!-- 指标标题和搜索 -->
+                  <div class="flex-row justify-between items-center group_2 mb-5" >
+                    <span class="font_3">衍生指标</span>
+                    <div class="flex-row items-center">
+                      <div class="flex-row shrink-0 group_1">
+                        <div class="flex-col justify-start items-start text-wrapper">
+                          <input class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入搜索内容" />
+                        </div>
+                        <a-button type="primary" class="search-button" @click="handleReportSearch">
+                          <template #icon><SearchOutlined /></template>
+                          搜索
+                        </a-button>
                       </div>
                     </div>
+                  </div>
 
-                    <!-- 字母索引 -->
-                    <div class="alphabet-index-vertical" v-if="panelSortStates.derivedIndicator && availableLetters.length > 0">
-                      <div class="alphabet-letters-vertical">
+                  <!-- 测试1行 - 放置在表格上方 -->
+                  <!--                <div class="test-row-container mb-3 p-2 border border-gray-200 rounded-md bg-gray-50">-->
+                  <!--                  <div class="editable-row">-->
+                  <!--                    <input v-if="isEditingTestRow" type="text" v-model="testRowName" class="edit-input" @blur="saveTestRow" @keyup.enter="saveTestRow">-->
+                  <!--                    <span v-else class="test-row-name">测试1</span>-->
+                  <!--                    <span class="edit-icon" @click="toggleTestRowEdit">✏️</span>-->
+                  <!--                  </div>-->
+                  <!--                </div>-->
+
+                  <!-- 表格和控制区域容器 -->
+                  <div class="table-with-controls-container">
+                    <!-- 表格容器 -->
+                    <div class="table-container indicator-table-container" @scroll="handleScroll">
+                      <table class="report-table">
+                        <thead>
+                        <tr>
+                          <th class="small-header">
+                            <span class="column-name-small">所有列</span>
+                          </th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <template v-for="group in groupedDerivedIndicatorData" :key="group.letter">
+                          <!-- 字母分组行 -->
+                          <tr class="alphabet-group-header" :id="`letter-${group.letter}`" :data-letter="group.letter" v-if="panelSortStates.derivedIndicator">
+                            <td class="alphabet-group-cell">{{ group.letter }}</td>
+                          </tr>
+                          <!-- 指标数据行 -->
+                          <tr v-for="item in group.items" :key="item.id" @click="() => handleIndicatorClick(item)">
+                            <td>{{ item.name }}</td>
+                          </tr>
+                        </template>
+                        <!-- 当没有数据时显示 -->
+                        <tr v-if="groupedDerivedIndicatorData.length === 0">
+                          <td class="no-data">暂无数据</td>
+                        </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <!-- 右侧控制区域 - 竖直排列 -->
+                    <div class="right-controls-vertical">
+                      <!-- 排序按钮 -->
+                      <div class="sort-control" @click="toggleIndicatorSort('derivedIndicator')" :class="{ 'active': panelSortStates.derivedIndicator }" :title="panelSortStates.derivedIndicator ? '排序已开启' : '排序已关闭'">
+                        <span>字符索引</span>
+                        <div class="toggle-switch">
+                          <div class="toggle-switch-track"></div>
+                          <div class="toggle-switch-thumb"></div>
+                        </div>
+                      </div>
+
+                      <!-- 字母索引 -->
+                      <div class="alphabet-index-vertical" v-if="panelSortStates.derivedIndicator && availableLetters.length > 0">
+                        <div class="alphabet-letters-vertical">
                     <span class="alphabet-letter"
                           v-for="letter in derivedAvailableLetters"
                           :key="letter"
@@ -1170,57 +1235,59 @@ defineExpose({
                           :class="{ 'selected': panelCurrentLetters.derivedIndicator === letter }">
                       {{ letter }}
                     </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
 
+              </div>
             </div>
-          </div>
 
-          <!-- 公式验证信息提示和公式编写 (移动到表格下方) -->
-          <div class="flex-row justify-between items-end group_15 mt-20">
-            <div class="flex-col">
-              <span class="font text_75">公式验证信息提示</span>
-              <!-- 添加验证结果显示 -->
-              <div
-                  v-if="validationMessage"
-                  :class="['validation-message', { 'success': isValidationSuccess, 'error': !isValidationSuccess }]"        style="margin-top: 10px; padding: 8px; border-radius: 4px;"
-              >
-                {{ validationMessage }}
+            <!-- 公式验证信息提示和公式编写 (移动到表格下方) -->
+            <div class="flex-row justify-between items-end group_15 mt-20">
+              <div class="flex-col">
+                <span class="font text_75">公式验证信息提示</span>
+                <!-- 添加验证结果显示 -->
+                <div
+                    v-if="validationMessage"
+                    :class="['validation-message', { 'success': isValidationSuccess, 'error': !isValidationSuccess }]"        style="margin-top: 10px; padding: 8px; border-radius: 4px;"
+                >
+                  {{ validationMessage }}
+                </div>
+                <div class="flex-row mt-20">
+                  <span class="font_7 text_79">公式编写</span>
+                </div>
               </div>
-              <div class="flex-row mt-20">
-                <span class="font_7 text_79">公式编写</span>
+              <div class="flex-row group_16">
+                <div class="flex-col justify-start items-center text-wrapper_13 ml-9">
+                  <span class="font_5 text_77" @click="handleValidate" style="cursor: pointer;">验证</span>
+                </div>
+
+                <div class="flex-col justify-start items-center text-wrapper_14 ml-9">
+                  <span class="font_5 text_78" style="cursor: pointer;"  @click="handleConfirm">确定</span>
+                </div>
               </div>
             </div>
-            <div class="flex-row group_16">
-              <div class="flex-col justify-start items-center text-wrapper_13">
-                <span class="font_5 text_77" @click="handleValidate" style="cursor: pointer;">验证</span>
-              </div>
-              <div class="flex-col justify-start items-center text-wrapper_14 ml-9">
-                <span class="font_5 text_78" style="cursor: pointer;"  @click="handleConfirm">确定</span>
-              </div>
-            </div>
-          </div>
-          <div class="draggable-input-container">
+            <div class="draggable-input-container">
             <textarea
                 class="draggable-input"
-                placeholder="请输入汇总单独处理公式"
+                placeholder="请输入衍生指标公式"
                 v-model="formulaText"
                 ref="draggableInputRef"
             ></textarea>
 
-            <!-- 添加占位符提示 -->
-            <div class="placeholder-hint" v-if="showPlaceholderHint" @click="insertAtPlaceholder">
-              <div class="hint-overlay">
-                <span class="hint-text">点击此处插入指标数据</span>
+              <!-- 添加占位符提示 -->
+              <div class="placeholder-hint" v-if="showPlaceholderHint" @click="insertAtPlaceholder">
+                <div class="hint-overlay">
+                  <span class="hint-text">点击此处插入指标数据</span>
+                </div>
               </div>
             </div>
+
+
           </div>
-
-
         </div>
       </div>
     </div>
@@ -2806,13 +2873,13 @@ report-table-container .ant-table-tbody > tr {
   transform: translateX(22px);
 }
 
-/* 页面整体滚动样式 */
+/* 页面整体滚动样式 - 实现页面覆盖效果 */
 .page {
   padding: 20px;
   overflow-y: auto;
   min-height: 95vh;
   height: fit-content;
-
+  background-color: #fff; /* 确保背景为白色，覆盖其他内容 */
 }
 
 /* 确保表格内容完整显示 */
@@ -2820,6 +2887,7 @@ report-table-container .ant-table-tbody > tr {
   flex: 1;
   min-height: 0;
 }
+
 .indicator-table-container .report-table td {
   padding: 4px 12px; /* 进一步缩小行高 */
   line-height: 1.2; /* 控制行高 */
@@ -2827,6 +2895,30 @@ report-table-container .ant-table-tbody > tr {
 
 .indicator-table-container .report-table tr {
   height: 24px; /* 设置固定行高 */
+}
+
+/* 覆盖容器样式 - 类似StatisticalDefinition的实现 */
+.equation-editor-container {
+  width: 100%;
+  height: 100%;
+  background: white;
+  overflow: hidden; /* 防止外层滚动 */
+}
+
+/* 确保公式编辑器覆盖整个视口 */
+:deep(.ant-layout) {
+  min-height: 100vh;
+}
+
+/* 防止页面其他部分滚动 */
+:global(body) {
+  overflow: hidden;
+}
+
+/* 确保组件内部有自己的滚动区域 */
+.editor-content {
+  overflow-y: auto;
+  max-height: calc(100vh - 100px); /* 减去头部和底部的高度 */
 }
 
 </style>

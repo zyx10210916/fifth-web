@@ -241,7 +241,7 @@
   />
   <CombinedConditionModal :indexQueryDate="indexQueryDate" :columnQueries="columnQueries" @handleOk="handleOk"
                           v-model:visible="combinedModalVisible" />
-  <SummaryModal v-model:visible="summaryModalVisible" />
+  <SummaryModal v-model:visible="summaryModalVisible" @select="handleSummarySelect" />
 
   <!-- 导出选项模态框 -->
   <ExportModal
@@ -324,6 +324,7 @@ const searchForm = reactive({
   operator: 'eq',
   queryValue: '',
   all: '1',
+  sumCode: '',
 });
 
 // 控制searchForm监听器是否执行的标志位
@@ -342,13 +343,15 @@ const getDataData = reactive({
   sortField: '',
   sortOrder: '',
   derivativeColumn: '',
-  derivativeTable: ''
+  derivativeTable: '',
+  sumCode: ''
 });
 
 // 监听searchForm的变化，确保getDataData始终保持最新
 watch(searchForm, (newForm) => {
   getDataData.tableName = newForm.currentReport;
   getDataData.specialtyCode = newForm.reportType;
+  getDataData.sumCode = newForm.sumCode;
 
   // 同步查询条件
   if (newForm.indexQuery) {
@@ -703,6 +706,15 @@ const showCombinedModal = () => {
 
 const showSummaryModal = () => {
   summaryModalVisible.value = true;
+};
+
+/**
+ * 处理常用汇总口径选择
+ */
+const handleSummarySelect = (code) => {
+  console.log('Selected summary code:', code);
+  searchForm.sumCode = code;
+  // 可以在这里触发查询或其他操作
 };
 
 // 处理过滤条件的显示

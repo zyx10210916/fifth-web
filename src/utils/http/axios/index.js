@@ -3,7 +3,7 @@ import { showMessage } from './status';
 import { getToken } from '@/utils/auth';
 const service = axios.create({
     baseURL: import.meta.env.VITE_APP_API_BASEURL,
-    timeout: 10000,
+    timeout: 60000,
 });
 service.interceptors.request.use((config) => {
     const token = getToken();

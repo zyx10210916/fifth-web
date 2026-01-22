@@ -1,7 +1,7 @@
 <template>
   <a-modal
       v-model:open="statisticalDefinitionVisible"
-      title="设置汇总口径"
+      title="设置衍生指标"
       width="90%"
       :footer="null"
       :z-index="1001"
@@ -136,12 +136,12 @@
             <div class="formula-section">
               <div class="formula-header">
                 <a-button type="primary" size="small" @click="openStatisticalDefinition">
-                  设置汇总口径
+                  设置衍生指标
                 </a-button>
               </div>
               <a-textarea
                   v-model:value="formulaText"
-                  placeholder="请通过'设置汇总口径'配置公式"
+                  placeholder="请通过'设置衍生指标'配置公式"
                   :disabled="true"
                   :rows="4"
               />
@@ -150,17 +150,17 @@
         </tr>
 
         <!-- 汇总时用不同公式行 -->
-        <tr>
-          <td style="word-break: break-all;">汇总时用不同公式</td>
-          <td colspan="3">
-            <a-textarea
-                v-model:value="formData.DIFFERENT_FORMULA"
-                placeholder="请输入汇总时使用的不同公式（如无则不填）"
-                :rows="3"
-                style="width:100%"
-            />
-          </td>
-        </tr>
+<!--        <tr>-->
+<!--          <td style="word-break: break-all;">汇总时用不同公式</td>-->
+<!--          <td colspan="3">-->
+<!--            <a-textarea-->
+<!--                v-model:value="formData.DIFFERENT_FORMULA"-->
+<!--                placeholder="请输入汇总时使用的不同公式（如无则不填）"-->
+<!--                :rows="3"-->
+<!--                style="width:100%"-->
+<!--            />-->
+<!--          </td>-->
+<!--        </tr>-->
 
         <!-- 归属报表和标签行 -->
         <tr>

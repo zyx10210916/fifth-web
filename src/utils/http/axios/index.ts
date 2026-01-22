@@ -6,7 +6,7 @@ import { getToken } from '@/utils/auth';
 
 const service: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_APP_API_BASEURL,
-  timeout: 10000,
+  timeout: 300000,
 });
 
 // axios实例拦截请求

@@ -55,8 +55,9 @@ export const useTableHooks = () => {
           title,
           dataIndex: title,
           key: title,
-          width: 120,
-          minWidth: 120,
+          maxwidth: 300,
+          width: 260,
+          minWidth: 150,
           customCell: (record: any, rowIndex: number) => {
             const cellValue = record[title];
             const hasData = cellValue !== undefined && cellValue !== null && cellValue !== '';

@@ -6,14 +6,14 @@ import dtActive from "@/assets/images/dt-2.png";
 import yxtNormal from "@/assets/images/yxt-1.png";
 import yxtActive from "@/assets/images/yxt-2.png";
 
-const GEOSERVER_BASE = "http://192.168.10.123:8089/geoserver/dataCenterWorkspace";
-const LAYER_BUILDING = "dataCenterWorkspace:gongbaokushujuhebingpc38";
+const GEOSERVER_BASE = "http://10.44.58.28:8089/geoserver/workspace";
+const LAYER_BUILDING = "dataCenterWorkspace:juheshujupc38";
 
 export const MAP_CONFIG = {
   // ArcGIS API 基础配置
   arcgis: {
-    js: "http://192.168.94.114/4.19/init.js",
-    css: "http://192.168.94.114/4.19/esri/themes/light/main.css"
+    js: "http://10.44.58.28:8000/4.19/init.js",
+    css: "http://10.44.58.28:8000/4.19/esri/themes/light/main.css"
   },
 
   // 默认地图范围
@@ -29,7 +29,7 @@ export const MAP_CONFIG = {
    economic: {
     building: {
       id: "building", 
-      maxScale: 30000,
+      maxScale: 500000,
       layerName: LAYER_BUILDING,
       wmsUrl: `${GEOSERVER_BASE}/wms`,
       getWfsUrl: (bbox: string) => {
@@ -54,7 +54,7 @@ export const MAP_CONFIG = {
       }
     },
     // 房屋面 URL
-    houseUrl: "http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dataCenterWorkspace%3AWJPFWMpc38&maxFeatures=500&outputFormat=application%2Fjson"
+    houseUrl: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&maxFeatures=500&outputFormat=application%2Fjson"
   },
 
   // 底图服务 URL

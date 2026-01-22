@@ -173,6 +173,7 @@
             :list="tabsConfig"
             :clickable="true"
             @click:item="handleOverviewItem"
+            @click:dropdown="handleDropdownClick"
             :tabList="tabsConfig"
         />
 
@@ -1056,6 +1057,19 @@ const tabsConfig = computed(() => {
       key: 'drawChart',
       icon: BarChartOutlined,
       iconFont: 1.6,
+    },
+    {
+      title: '常用汇总口径',
+      key: 'commonSummaryCaliber',
+      // icon: SettingOutlined,
+      iconFont: 1.6,
+      children: [
+        {title: '普查中心单位数汇总标记', key: 'pczxdws'},
+        {title: '人口处汇总标记', key: 'rkcrs'},
+        {title: '专业单位数汇总标记', key: 'zydws'},
+        {title: '专业人数汇总标记', key: 'zyrs'},
+        {title: '专业经济指标汇总标记', key: 'zyjjzb'},
+      ]
     },
     {
       title: '保存模板',
@@ -2122,6 +2136,14 @@ const handleOverviewItem = (item: any): void => {
       templateModalVisible.value = true;
       break;
   }
+};
+
+/**
+ * @desc: 处理常用汇总口径下拉菜单点击
+ */
+const handleDropdownClick = (e: any, parentItem: any): void => {
+  console.log('Dropdown clicked:', e, parentItem);
+  message.info(`您选择了${e.key}汇总口径`);
 };
 
 /**

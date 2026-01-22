@@ -823,7 +823,7 @@ const loadReportData = async (pageNo = 1, pageSize = 10) => {
     const response = await buniscGetData({
       pageNo,
       pageSize,
-      sortField: "TABLE_NAME",
+      sortField: "",
       sortOrder: "asc",
       params:
           { Q_TABLE_NAME_S_LK: reportSearchQuery.value }
@@ -841,7 +841,7 @@ const loadReportData = async (pageNo = 1, pageSize = 10) => {
         const res = await buniscGetData({
           pageNo,
           pageSize,
-          sortField: "TABLE_NAME",
+          sortField: "",
           sortOrder: "asc",
           params:  { Q_TABLE_NUM_S_LK: reportSearchQuery.value}
         });
@@ -1084,7 +1084,7 @@ defineExpose({
                     <div class="flex-row shrink-0 group_1">
                       <div class="flex-col justify-start items-start text-wrapper">
                         <input v-model="reportSearchQuery" class="font_4 text_5 w-40 h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                               placeholder="请输入表名"
+                               placeholder="请输入表名/表号"
                                @input="handleReportInputChange"
                         />
                       </div>

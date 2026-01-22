@@ -241,7 +241,7 @@
 
       <!-- 表格 -->
       <div class="table-container">
-        <RectangleTab :list="tabsConfig" :clickable="true" @click:item="handleOverviewItem" :tabList="tabsConfig"/>
+        <RectangleTab :list="tabsConfig" :clickable="true" @click:item="handleOverviewItem" @click:dropdown="handleDropdownClick" :tabList="tabsConfig"/>
 
         <a-table
             :dataSource="tableDataSource"
@@ -257,6 +257,18 @@
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.dataIndex === 'index'">
               {{ index + 1 }}
+            </template>
+            <!-- 自定义第一列单元格渲染，实现对角线分割 -->
+            <template v-else-if="column.dataIndex === 'A' && record.isHeader">
+              <div class="diagonal-cell">
+                <div class="diagonal-line"></div>
+                <div class="row-header">{{ record.A.rowHeaderText }}</div>
+                <div class="col-header">{{ record.A.colHeaderText }}</div>
+              </div>
+            </template>
+            <!-- 处理其他数据 -->
+            <template v-else-if="column.dataIndex === 'A'">
+              <div>{{ record[column.dataIndex] || '' }}</div>
             </template>
           </template>
         </a-table>
@@ -531,8 +543,74 @@ const processLargeDataSet = async (resDataList: any[], isCurrentTask: () => bool
       const resData = safeDataList[tableIndex];
       const tableRows: TableRow[] = [];
 
-      // 处理表头
-      if (resData.columns && resData.columns.length) {
+      // 处理新的数据格式
+      if (resData.rowHeaders && resData.columnHeaders && resData.data) {
+        // 创建表头行
+        const headerRow: TableRow = {isHeader: true, key: `header-${tableIndex}`};
+
+        // 第一行第一列同时显示行表头和列表头，分开存储以便实现对角线分割
+        const rowHeaderText = resData.rowHeaders.map((rh: any) => rh.columnName).join('\\');
+        const colHeaderText = resData.columnHeaders.map((ch: any) => ch.columnName).join('\\');
+        // 同时存储原始字符串和对象格式，方便不同场景使用
+        headerRow['A'] = {
+          rowHeaderText,
+          colHeaderText,
+          toString: () => rowHeaderText + '\\' + colHeaderText
+        };
+
+        // 获取列表头的columnCode
+        const columnCode = resData.columnHeaders[0].columnCode;
+
+        // 收集所有数据的columnCode对应的值
+        const columnValues = Object.values(resData.data).map((rowData: any) => rowData[columnCode]);
+
+        // 第一行的其他列显示所有数据的columnCode对应的值
+        columnValues.forEach((value, index) => {
+          const letter = String.fromCharCode(66 + index); // B, C, D...
+          headerRow[letter] = value;
+        });
+
+        tableRows.push(headerRow);
+
+        // 处理数据行
+        const dataKeys = Object.keys(resData.data);
+        dataKeys.forEach((rowKey, rowIndex) => {
+          const rowData = resData.data[rowKey];
+          const newRow: TableRow = {key: `${rowKey}-${tableIndex}`};
+          newRow['A'] = rowKey; // 第一列显示数据键名（2025、你奥等）
+
+          // 填充各列对应的数据
+          columnValues.forEach((value, colIndex) => {
+            const letter = String.fromCharCode(66 + colIndex); // B, C, D...
+
+            // 动态获取汇总指标字段名：排除rowHeaders和columnHeaders中已有的字段
+            const rowHeaderFields = resData.rowHeaders.map((rh: any) => rh.columnCode);
+            const columnHeaderFields = resData.columnHeaders.map((ch: any) => ch.columnCode);
+            const allHeaderFields = [...rowHeaderFields, ...columnHeaderFields];
+
+            // 获取数据对象中除了表头字段外的字段，即汇总指标字段
+            const summaryFields = Object.keys(rowData).filter(key => !allHeaderFields.includes(key));
+            // 取第一个汇总指标字段
+            const summaryField = summaryFields[0] || '';
+
+            // 当前行的当前列显示汇总指标值
+            newRow[letter] = (rowIndex === colIndex) ? (rowData[summaryField] || '') : '';
+          });
+
+          tableRows.push(newRow);
+        });
+
+        // 使用requestAnimationFrame确保平滑更新
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        tableDataList.value = [...tableDataList.value, tableRows];
+        triggerRef(tableDataList);
+
+        // 当表头显示后，关闭加载状态
+        if (!firstBatchShown) {
+          firstBatchShown = true;
+          tableLoading.value = false;
+        }
+      } else if (resData.columns && resData.columns.length) {
         const headerRow: TableRow = {isHeader: true, key: `header-${tableIndex}`};
         resData.columns.slice(0, 15).forEach((col: any) => {
           headerRow[col.key] = col.title;
@@ -552,8 +630,8 @@ const processLargeDataSet = async (resDataList: any[], isCurrentTask: () => bool
         }
       }
 
-      // 增量处理数据行
-      if (resData.rows && resData.rows.length) {
+      // 增量处理数据行 - 对于新的数据格式，不需要处理resData.rows
+      if (resData.rows && resData.rows.length && !(resData.rowHeaders && resData.columnHeaders && resData.data)) {
         // 更严格的数据量限制
         const safeRows = resData.rows.slice(0, 50000); // 限制最大行数
         const totalRows = safeRows.length;
@@ -848,68 +926,129 @@ const processSmallDataSetDirectly = (resDataList: any[], isCurrentTask: () => bo
       const resData = resDataList[tableIndex];
       const tableRows: TableRow[] = [];
 
-      // 处理表头
-      if (resData.columns && resData.columns.length) {
+      // 处理新的数据格式
+      if (resData.rowHeaders && resData.columnHeaders && resData.data) {
+        // 创建表头行
         const headerRow: TableRow = {isHeader: true, key: `header-${tableIndex}`};
-        resData.columns.slice(0, 15).forEach((col: any) => {
-          headerRow[col.key] = col.title;
+
+        // 第一行第一列同时显示行表头和列表头，分开存储以便实现对角线分割
+        const rowHeaderText = resData.rowHeaders.map((rh: any) => rh.columnName).join('\\');
+        const colHeaderText = resData.columnHeaders.map((ch: any) => ch.columnName).join('\\');
+        // 同时存储原始字符串和对象格式，方便不同场景使用
+        headerRow['A'] = {
+          rowHeaderText,
+          colHeaderText,
+          toString: () => rowHeaderText + '\\' + colHeaderText
+        };
+
+        // 获取列表头的columnCode
+        const columnCode = resData.columnHeaders[0].columnCode;
+
+        // 收集所有数据的columnCode对应的值
+        const columnValues = Object.values(resData.data).map((rowData: any) => rowData[columnCode]);
+
+        // 第一行的其他列显示所有数据的columnCode对应的值
+        columnValues.forEach((value, index) => {
+          const letter = String.fromCharCode(66 + index); // B, C, D...
+          headerRow[letter] = value;
         });
+
         tableRows.push(headerRow);
-      }
 
-      // 处理所有数据行
-      if (resData.rows && resData.rows.length) {
-        for (let i = 0; i < resData.rows.length; i++) {
-          const row = resData.rows[i];
-          const newObj: TableRow = {key: row.key || `row-${i}`};
+        // 处理数据行
+        const dataKeys = Object.keys(resData.data);
+        dataKeys.forEach((rowKey: string, rowIndex: number) => {
+          const rowData = resData.data[rowKey];
+          const newRow: TableRow = {key: `${rowKey}-${tableIndex}`};
+          newRow['A'] = rowKey; // 第一列显示数据键名（2025、你奥等）
 
-          if (row.key === 'total_row') {
-            // 处理总计行
-            (resData.columns || []).slice(0, 15).forEach((col: any) => {
-              const colKey = col.key;
-              const colDataIndex = col.dataIndex;
-              let targetValue = '';
+          // 填充各列对应的数据
+          columnValues.forEach((value, colIndex) => {
+            const letter = String.fromCharCode(66 + colIndex); // B, C, D...
 
-              if (colKey === 'index') {
-                targetValue = '总计';
-                newObj[colKey] = targetValue;
-                return;
-              }
+            // 动态获取汇总指标字段名：排除rowHeaders和columnHeaders中已有的字段
+            const rowHeaderFields = resData.rowHeaders.map((rh: any) => rh.columnCode);
+            const columnHeaderFields = resData.columnHeaders.map((ch: any) => ch.columnCode);
+            const allHeaderFields = [...rowHeaderFields, ...columnHeaderFields];
 
-              if (colDataIndex && row.data && Object.prototype.hasOwnProperty.call(row.data, colDataIndex)) {
-                targetValue = row.data[colDataIndex];
-              } else if (row.data && Object.prototype.hasOwnProperty.call(row.data, colKey)) {
-                targetValue = row.data[colKey];
-              }
+            // 获取数据对象中除了表头字段外的字段，即汇总指标字段
+            const summaryFields = Object.keys(rowData).filter(key => !allHeaderFields.includes(key));
+            // 取第一个汇总指标字段
+            const summaryField = summaryFields[0] || '';
 
-              newObj[colKey] = targetValue  === null || targetValue === undefined ? '' : targetValue;
-            });
+            // 当前行的当前列显示汇总指标值
+            newRow[letter] = (rowIndex === colIndex) ? (rowData[summaryField] || '') : '';
+          });
 
-            newObj.isTotalRow = true;
-            newObj.isTotalRow = true;
-          } else {
-            // 处理普通行
-            (resData.columns || []).slice(0, 15).forEach((col: any) => {
-              const colKey = col.key;
-              const colDataIndex = col.dataIndex;
-              let targetValue = '';
+          tableRows.push(newRow);
+        });
 
-              if (colDataIndex && row.data && Object.prototype.hasOwnProperty.call(row.data, colDataIndex)) {
-                targetValue = row.data[colDataIndex];
-              } else if (row.data && Object.prototype.hasOwnProperty.call(row.data, colKey)) {
-                targetValue = row.data[colKey];
-              }
-
-              newObj[colKey] = targetValue === null || targetValue === undefined ? '' : targetValue;
-            });
-            newObj.isNormalRow = true;
-          }
-
-          tableRows.push(newObj);
+        // 添加到所有表格数据数组中
+        allTablesData.push(tableRows);
+      } else {
+        // 处理旧的数据格式
+        if (resData.columns && resData.columns.length) {
+          const headerRow: TableRow = {isHeader: true, key: `header-${tableIndex}`};
+          resData.columns.slice(0, 15).forEach((col: any) => {
+            headerRow[col.key] = col.title;
+          });
+          tableRows.push(headerRow);
         }
-      }
 
-      allTablesData.push(tableRows);
+        // 处理所有数据行
+        if (resData.rows && resData.rows.length) {
+          for (let i = 0; i < resData.rows.length; i++) {
+            const row = resData.rows[i];
+            const newObj: TableRow = {key: row.key || `row-${i}`};
+
+            if (row.key === 'total_row') {
+              // 处理总计行
+              (resData.columns || []).slice(0, 15).forEach((col: any) => {
+                const colKey = col.key;
+                const colDataIndex = col.dataIndex;
+                let targetValue = '';
+
+                if (colKey === 'index') {
+                  targetValue = '总计';
+                  newObj[colKey] = targetValue;
+                  return;
+                }
+
+                if (colDataIndex && row.data && Object.prototype.hasOwnProperty.call(row.data, colDataIndex)) {
+                  targetValue = row.data[colDataIndex];
+                } else if (row.data && Object.prototype.hasOwnProperty.call(row.data, colKey)) {
+                  targetValue = row.data[colKey];
+                }
+
+                newObj[colKey] = targetValue  === null || targetValue === undefined ? '' : targetValue;
+              });
+
+              newObj.isTotalRow = true;
+              newObj.isTotalRow = true;
+            } else {
+              // 处理普通行
+              (resData.columns || []).slice(0, 15).forEach((col: any) => {
+                const colKey = col.key;
+                const colDataIndex = col.dataIndex;
+                let targetValue = '';
+
+                if (colDataIndex && row.data && Object.prototype.hasOwnProperty.call(row.data, colDataIndex)) {
+                  targetValue = row.data[colDataIndex];
+                } else if (row.data && Object.prototype.hasOwnProperty.call(row.data, colKey)) {
+                  targetValue = row.data[colKey];
+                }
+
+                newObj[colKey] = targetValue === null || targetValue === undefined ? '' : targetValue;
+              });
+              newObj.isNormalRow = true;
+            }
+
+            tableRows.push(newObj);
+          }
+        }
+
+        allTablesData.push(tableRows);
+      }
     }
 
     // 一次性更新数据，不使用triggerRef以减少响应式开销
@@ -953,8 +1092,113 @@ const processDataInMainThread = async (resDataList: any[], isCurrentTask: () => 
       const resData = safeDataList[tableIndex];
       const tableRows: TableRow[] = [];
 
-      // 处理表头
-      if (resData.columns && resData.columns.length) {
+      // 处理新的数据格式
+      if (resData.rowHeaders && resData.columnHeaders && resData.data) {
+        // 创建表头行
+        const headerRow: TableRow = {isHeader: true, key: `header-${tableIndex}`};
+
+        // 第一行第一列同时显示行表头和列表头，分开存储以便实现对角线分割
+        const rowHeaderText = resData.rowHeaders.map((rh: any) => rh.columnName).join('\\');
+        const colHeaderText = resData.columnHeaders.map((ch: any) => ch.columnName).join('\\');
+        // 同时存储原始字符串和对象格式，方便不同场景使用
+        headerRow['A'] = {
+          rowHeaderText,
+          colHeaderText,
+          toString: () => rowHeaderText + '\\' + colHeaderText
+        };
+
+        // 获取列表头的columnCode
+        const columnCode = resData.columnHeaders[0].columnCode;
+
+        // 收集所有数据的columnCode对应的值
+        const columnValues = Object.values(resData.data).map((rowData: any) => rowData[columnCode]);
+
+        // 第一行的其他列显示所有数据的columnCode对应的值
+        columnValues.forEach((value, index) => {
+          const letter = String.fromCharCode(66 + index); // B, C, D...
+          headerRow[letter] = value;
+        });
+
+        tableRows.push(headerRow);
+
+        // 使用requestAnimationFrame确保平滑更新
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        tableDataList.value = [...tableDataList.value, tableRows];
+        triggerRef(tableDataList);
+
+        if (!firstBatchShown) {
+          firstBatchShown = true;
+          tableLoading.value = false;
+        }
+
+        // 处理数据行
+        const dataKeys = Object.keys(resData.data);
+        const totalRows = dataKeys.length;
+        const batchSize = Math.min(MAX_BATCH_SIZE, Math.ceil(totalRows / 50));
+
+        for (let i = 0; i < totalRows; i += batchSize) {
+          const batch = dataKeys.slice(i, i + batchSize);
+          const batchRows: TableRow[] = [];
+
+          for (const rowKey of batch) {
+            const rowData = resData.data[rowKey];
+            const newRow: TableRow = {key: `${rowKey}-${tableIndex}`};
+            newRow['A'] = rowKey; // 第一列显示数据键名（2025、你奥等）
+
+            // 填充各列对应的数据
+            columnValues.forEach((value, colIndex) => {
+              const letter = String.fromCharCode(66 + colIndex); // B, C, D...
+
+              // 动态获取汇总指标字段名：排除rowHeaders和columnHeaders中已有的字段
+              const rowHeaderFields = resData.rowHeaders.map((rh: any) => rh.columnCode);
+              const columnHeaderFields = resData.columnHeaders.map((ch: any) => ch.columnCode);
+              const allHeaderFields = [...rowHeaderFields, ...columnHeaderFields];
+
+              // 获取数据对象中除了表头字段外的字段，即汇总指标字段
+              const summaryFields = Object.keys(rowData).filter(key => !allHeaderFields.includes(key));
+              // 取第一个汇总指标字段
+              const summaryField = summaryFields[0] || '';
+
+              // 当前行的当前列显示汇总指标值
+              newRow[letter] = (dataKeys.indexOf(rowKey) === colIndex) ? (rowData[summaryField] || '') : '';
+            });
+
+            batchRows.push(newRow);
+          }
+
+          // 更新当前表格的数据
+          const updatedTables = [...tableDataList.value];
+          if (!updatedTables[tableIndex]) {
+            updatedTables[tableIndex] = [];
+          }
+          updatedTables[tableIndex] = [...updatedTables[tableIndex], ...batchRows];
+
+          // 检查是否已取消或不是当前任务
+          if (renderAbortController?.signal.aborted || !isCurrentTask()) {
+            return;
+          }
+
+          // 节流更新UI
+          const now = Date.now();
+          if (now - lastUpdateTime > UPDATE_INTERVAL) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+
+            // 再次检查是否已取消或不是当前任务
+            if (renderAbortController?.signal.aborted || !isCurrentTask()) {
+              return;
+            }
+
+            tableDataList.value = updatedTables;
+            triggerRef(tableDataList);
+            lastUpdateTime = now;
+          }
+
+          // 更新进度
+          processingProgress.value = Math.round((i / totalRows) * 100);
+        }
+
+        processingProgress.value = 0;
+      } else if (resData.columns && resData.columns.length) {
         const headerRow: TableRow = {isHeader: true, key: `header-${tableIndex}`};
         resData.columns.slice(0, 15).forEach((col: any) => {
           headerRow[col.key] = col.title;
@@ -973,7 +1217,7 @@ const processDataInMainThread = async (resDataList: any[], isCurrentTask: () => 
       }
 
       // 增量处理数据行
-      if (resData.rows && resData.rows.length) {
+      if (resData.rows && resData.rows.length && !(resData.rowHeaders && resData.columnHeaders && resData.data)) {
         const safeRows = resData.rows.slice(0, 5000); // 限制最大行数
         const totalRows = safeRows.length;
 
@@ -1185,6 +1429,19 @@ const tabsConfig = [
     iconFont: 1.6,
   },
   {
+    title: '常用汇总口径',
+    key: 'commonSummaryCaliber',
+    // icon: SettingOutlined,
+    iconFont: 1.6,
+    children: [
+      {title: '普查中心单位数汇总标记', key: 'pczxdws'},
+      {title: '人口处汇总标记', key: 'rkcrs'},
+      {title: '专业单位数汇总标记', key: 'zydws'},
+      {title: '专业人数汇总标记', key: 'zyrs'},
+      {title: '专业经济指标汇总标记', key: 'zyjjzb'},
+    ]
+  },
+  {
     title: '保存模板',
     key: 'saveTemplate',
     icon: SaveOutlined,
@@ -1226,6 +1483,9 @@ const handleTemplateModalSave = async (data: any): Promise<void> => {
         summaryQueries.push(tableConfig);
       }
 
+      // 将主栏字段添加到groupFields数组中
+      tableConfig.groupFields.push(item.key);
+
       if (item.formatValue && item.formatValue.trim() !== '') {
         tableConfig.interceptQueries.push({
           columnName: item.key,
@@ -1233,7 +1493,6 @@ const handleTemplateModalSave = async (data: any): Promise<void> => {
         });
       }
 
-      tableConfig.groupFields.push(item.key);
     });
 
     // 处理系统项
@@ -1264,7 +1523,7 @@ const handleTemplateModalSave = async (data: any): Promise<void> => {
         });
       }
 
-      tableConfig.groupFields.push(item.key);
+      // 宾栏字段不再添加到groupFields数组，只通过subGroupFields传递
     });
 
     // 处理普通项
@@ -1294,7 +1553,7 @@ const handleTemplateModalSave = async (data: any): Promise<void> => {
         });
       }
 
-      tableConfig.groupFields.push(item.key);
+      // 宾栏字段不再添加到groupFields数组，只通过subGroupFields传递
     });
 
     // 处理汇总指标
@@ -1321,12 +1580,25 @@ const handleTemplateModalSave = async (data: any): Promise<void> => {
       }
     });
 
+    // 构建新的参数格式
+    // 将side columns（宾栏）添加到subGroupFields
+    const checkedSystemForSubGroup = checkedSystem.filter(item => item.key !== 'total');
+    const subGroupFields = [...checkedSystemForSubGroup.map(item => item.key), ...normalSideList.value.filter(item => item.key !== 'total').map(item => item.key)];
+
+    // 将每个tableConfig包装到tableQueries中
+    const crosssumQueries = summaryQueries.map(tableConfig => ({
+      tableQueries: [{
+        ...tableConfig,
+        subGroupFields: subGroupFields
+      }]
+    }));
+
     // 构建模板数据
     const templateData = {
       template_name: data.formData.name,
       template_desc: data.formData.description,
       cjr: data.formData.creator,
-      sum_op: summaryQueries,
+      sum_op: JSON.stringify(crosssumQueries), // 使用新的格式并转换为JSON字符串
       sfzmb: '1' ,
       type: '2', // 表示交叉汇总
     };
@@ -1446,6 +1718,29 @@ const addToColumn = (area: 'main' | 'side' | 'summary', node: { key: string; tit
   if (isDuplicateInArea(area)) {
     console.warn('字段不可重复添加');
     message.warning('该指标已存在于当前栏目中');
+    return;
+  }
+
+  // 限制每个栏目只能选择一个
+  if (area === 'main' && mainList.value.length >= 1) {
+    console.warn('主栏只能选择一个');
+    message.warning('主栏只能选择一个');
+    return;
+  }
+
+  if (area === 'side') {
+    // 宾栏的限制包括系统项（已勾选）和普通项
+    const sideItemsCount = systemItems.value.filter((item) => item.checked).length + normalSideList.value.length;
+    if (sideItemsCount >= 1) {
+      console.warn('宾栏只能选择一个');
+      message.warning('宾栏只能选择一个');
+      return;
+    }
+  }
+
+  if (area === 'summary' && summaryList.value.length >= 1) {
+    console.warn('汇总指标只能选择一个');
+    message.warning('汇总指标只能选择一个');
     return;
   }
 
@@ -1632,7 +1927,7 @@ const isDuplicateInArea = (area: 'main' | 'side' | 'summary') => {
     );
   } else if (area === 'main') {
     const sideKeys = [
-      ...systemItems.value.filter((item) => item.checked).map((item) => item.key),
+      ...systemItems.value.filter((item) => item.checked).map((item) => ({key: item.key, tablecode: item.tablecode})),
       ...normalSideList.value.map((item) => ({key: item.key, tablecode: item.tablecode})),
     ];
     isCrossDuplicate = sideKeys.some(item =>
@@ -1644,7 +1939,7 @@ const isDuplicateInArea = (area: 'main' | 'side' | 'summary') => {
     );
   } else if (area === 'summary') {
     const sideKeys = [
-      ...systemItems.value.filter((item) => item.checked).map((item) => item.key),
+      ...systemItems.value.filter((item) => item.checked).map((item) => ({key: item.key, tablecode: item.tablecode})),
       ...normalSideList.value.map((item) => ({key: item.key, tablecode: item.tablecode})),
     ];
     isCrossDuplicate = sideKeys.some(item =>
@@ -1892,8 +2187,7 @@ const executeSummary = async () => {
         });
       }
 
-      // 将宾栏字段添加到分组字段（与主栏一致，只添加到groupFields数组）
-      tableConfig.groupFields.push(item.key);
+      // 宾栏字段不再添加到groupFields数组，只通过subGroupFields传递
     });
 
     // 处理普通项（包括衍生指标，与主栏处理方式一致）
@@ -1923,8 +2217,7 @@ const executeSummary = async () => {
         });
       }
 
-      // 将宾栏字段添加到分组字段（与主栏一致，只添加到groupFields数组）
-      tableConfig.groupFields.push(item.key);
+      // 宾栏字段不再添加到groupFields数组，只通过subGroupFields传递
     });
 
     summaryList.value.forEach(item => {
@@ -1951,9 +2244,21 @@ const executeSummary = async () => {
     });
 
 
-    // 构建参数
-    const params: FindQuickSumaryParams = {
-      summaryQueries: summaryQueries
+    // 构建新的参数格式
+    // 将side columns（宾栏）添加到subGroupFields
+    const checkedSystemForSubGroup = checkedSystem.filter(item => item.key !== 'total');
+    const subGroupFields = [...checkedSystemForSubGroup.map(item => item.key), ...normalSideList.value.filter(item => item.key !== 'total').map(item => item.key)];
+
+    // 将每个tableConfig包装到tableQueries中
+    const crosssumQueries = summaryQueries.map(tableConfig => ({
+      tableQueries: [{
+        ...tableConfig,
+        subGroupFields: subGroupFields
+      }]
+    }));
+
+    const params = {
+      crossSumQueries: crosssumQueries
     };
 
     console.log('发送给后端的参数:', JSON.stringify(params, null, 2)); // 调试用
@@ -2013,7 +2318,7 @@ const executeSummary = async () => {
       } else if (isMediumDataSet && WorkerManager.isSupported()) {
         try {
           // 中等数据量尝试使用Worker，但增加更严格的错误处理
-          await processDataWithWorker(resDataList, isCurrentTask);
+          await processDataInMainThread(resDataList, isCurrentTask);
         } catch (workerError) {
           console.warn('Worker处理失败，降级到主线程:', workerError);
           await processDataInMainThread(resDataList, isCurrentTask);
@@ -2168,9 +2473,15 @@ const handleOverviewItem = (item: any) => {
       break;
   }
 };
+
+const handleDropdownClick = (e: any, parentItem: any) => {
+  console.log('Dropdown clicked:', e, parentItem);
+  // 这里可以添加具体的汇总口径处理逻辑
+  message.info(`您选择了${e.key}汇总口径`);
+};
 // ======================== 表格逻辑 E ========================
-// 更新主栏字段的中文名称
-const updateMainFieldTitles = () => {
+// 更新字段的中文名称
+const updateFieldTitles = () => {
   try {
     if (!treeData.value || !treeData.value.length) return;
 
@@ -2197,9 +2508,16 @@ const updateMainFieldTitles = () => {
       }
     });
 
-    console.log('主栏字段中文名称已更新');
+    // 更新宾栏字段的title
+    normalSideList.value.forEach(item => {
+      if (fieldMap.has(item.key)) {
+        item.title = fieldMap.get(item.key);
+      }
+    });
+
+    console.log('字段中文名称已更新');
   } catch (error) {
-    console.error('更新主栏字段中文名称失败:', error);
+    console.error('更新字段中文名称失败:', error);
   }
 };
 
@@ -2209,7 +2527,7 @@ watch(
     async (newData) => {
       const res = await loadTreeData(newData);
       treeData.value = res;
-      updateMainFieldTitles();
+      updateFieldTitles();
     },
     {
       immediate: true,
@@ -2483,7 +2801,11 @@ const parseSumOpData = () => {
       // 解析sumOp数据
       sumOpArray.forEach((tableConfig, index) => {
         console.log(`处理tableConfig ${index}:`, tableConfig);
-        const { tableNum, tableName, groupFields, sumFields, interceptQueries = [] } = tableConfig;
+
+        // 检查是否有tableQueries字段，如果有则使用第一个元素
+        const queryConfig = tableConfig.tableQueries && tableConfig.tableQueries.length > 0 ? tableConfig.tableQueries[0] : tableConfig;
+
+        const { tableNum, tableName, groupFields, sumFields, subGroupFields = [], interceptQueries = [] } = queryConfig;
 
         // 处理groupFields - 确保是数组
         let groupFieldsArray = [];
@@ -2631,6 +2953,37 @@ const parseSumOpData = () => {
             summaryList.value.push(sideItem);
           }
         });
+
+        // 处理subGroupFields - 确保是数组
+        let subGroupFieldsArray = [];
+        if (Array.isArray(subGroupFields)) {
+          subGroupFieldsArray = subGroupFields;
+        } else if (typeof subGroupFields === 'string') {
+          // 按逗号分割字符串
+          subGroupFieldsArray = subGroupFields.split(',').map(item => item.trim());
+        }
+
+        console.log('处理后的subGroupFieldsArray:', subGroupFieldsArray);
+
+        // 将宾栏字段添加到normalSideList
+        subGroupFieldsArray.forEach(field => {
+          if (field) { // 确保field不为空
+            // 检查是否有对应的拦截条件
+            const formatValue = interceptQueriesMap[field] || '';
+
+            const sideItem = {
+              key: field,
+              title: field,
+              listNum: String(tableNum),
+              tableName: tableName || '',
+              tablecode: tableName || '',
+              formatType: 'truncate',
+              formatValue: formatValue
+            };
+            console.log('添加到宾栏:', sideItem);
+            normalSideList.value.push(sideItem);
+          }
+        });
       });
 
       console.log('最终主栏数据:', mainList.value);
@@ -2649,8 +3002,54 @@ const parseSumOpData = () => {
 };
 
 </script>
-
 <style lang="scss" scoped>
+// 对角线分割单元格样式
+.diagonal-cell {
+  position: relative;
+  width: 100%;
+  height: 8vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(0deg, rgba(181, 255, 246, 0.6), rgba(181, 255, 246, 0.6)), rgba(84, 111, 255, 1);
+  color: rgba(255, 255, 255, 1);
+  font-size: 1.6rem;
+  overflow: hidden;
+}
+
+.diagonal-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to left bottom, transparent calc(50% - 1px), rgba(255, 255, 255, 0.5) calc(50% - 1px), rgba(255, 255, 255, 0.5) calc(50% + 1px), transparent calc(50% + 1px));
+  pointer-events: none;
+}
+
+.row-header {
+  position: absolute;
+  bottom: 10px;
+  left: 5px;
+  font-size: 1.4rem;
+  z-index: 1;
+  line-height: 1.2;
+  transform: rotate(0deg);
+  transform-origin: bottom left;
+}
+
+.col-header {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 1.4rem;
+  z-index: 1;
+  line-height: 1.2;
+  text-align: right;
+  transform: rotate(0deg);
+  transform-origin: top right;
+}
+
 .quick-summary-container {
   display: flex;
   flex-direction: column;

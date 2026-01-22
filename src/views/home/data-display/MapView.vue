@@ -155,7 +155,7 @@ export default {
           mapIsReady.value = true;
           await nextTick();
           
-          // await loadBoundaryLayers(map);
+          await loadBoundaryLayers(map);
           await loadHouseLayer();
 
           // 绑定点击事件

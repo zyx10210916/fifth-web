@@ -186,7 +186,7 @@ const quickSummaryApi = async (data: FindQuickSumaryParams) => {
 // 交叉汇总
 const crossSummaryApi = async (data: FindQuickSumaryParams) => {
   return post<any>({
-    url: '/api/api-form/form/fifth/cross_summary/findCrossSumary',
+    url: '/api/api-form/form/fifth/two_dimension_table/get_two_dimension_table_data',
     data,
   });
 };

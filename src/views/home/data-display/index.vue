@@ -7,7 +7,7 @@
     <a-tab-pane key="summary" tab="汇总数据展示" />
     <a-tab-pane key="comparison" tab="数据比对展示" />
     <a-tab-pane key="heatmap" tab="单位热力图" />
-    <a-tab-pane key="building" tab="建筑物展示" />
+    <!-- <a-tab-pane key="building" tab="建筑物展示" /> -->
     
     <template #leftExtra>
        <div style="width: 1.6rem;"></div>
@@ -46,7 +46,7 @@ import FilterModal from './filter.vue';
 import SummaryDisplay from './summary-display/index.vue';
 import UnitHeatmap from './unit-heatmap/index.vue';
 import DataComparison from './data-comparison/index.vue';
-import BuildingDisplay from './building-display/index.vue';
+// import BuildingDisplay from './building-display/index.vue';
 
 const activeTabKey = ref('summary');
 const filterVisible = ref(false);
@@ -56,7 +56,7 @@ const componentMap = {
   summary: SummaryDisplay,
   heatmap: UnitHeatmap,
   comparison: DataComparison,
-  building: BuildingDisplay,
+  // building: BuildingDisplay,
 };
 
 const activeComponent = computed(() => componentMap[activeTabKey.value]);
