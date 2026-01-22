@@ -4,10 +4,10 @@
       <span class="label">热力权重：</span>
       <el-radio-group v-model="selectedField" size="small">
         <el-radio-button label="">按点密度</el-radio-button>
-        <el-radio-button label="ZCZJ">资产总计</el-radio-button>
-        <el-radio-button label="QMRS">期末人数</el-radio-button>
-        <el-radio-button label="YYLR">营业利润</el-radio-button>
-        <el-radio-button label="YYSR">营业收入</el-radio-button>
+        <el-radio-button label="zczj_sum">资产总计</el-radio-button>
+        <el-radio-button label="qmrs_sum">期末人数</el-radio-button>
+        <el-radio-button label="yylr_sum">营业利润</el-radio-button>
+        <el-radio-button label="yysr_sum">营业收入</el-radio-button>
       </el-radio-group>
     </div>
   </div>
@@ -19,7 +19,7 @@ import { ref, watch, onUnmounted, shallowRef } from 'vue';
 export default {
   name: 'HeatmapLayerManager',
   props: {
-    view: Object,      // ArcGIS View 实例
+    view: Object,      // ArcGIS View 实例 
     modules: Array,    // ArcGIS 模块数组
     points: Array,     // WFS 请求回来的当前视图点数据
     visible: Boolean   // 目录树控制的显隐
@@ -82,10 +82,10 @@ export default {
           },
           attributes: {
             ObjectId: idx,
-            ZCZJ: parseFloat(p.ZCZJ || 0),
-            YYLR: parseFloat(p.YYLR || 0),
-            QMRS: parseFloat(p.QMRS || 0),
-            YYSR: parseFloat(p.YYSR || 0)
+            zczj_sum: parseFloat(p.zczj_sum || 0),
+            yylr_sum: parseFloat(p.YYLR || 0),
+            qmrs_sum: parseFloat(p.QMRS || 0),
+            yysr_sum: parseFloat(p.yysr_sum || 0)
           }
         });
       });
@@ -98,10 +98,10 @@ export default {
         objectIdField: "ObjectId",
         fields: [
           { name: "ObjectId", type: "oid" },
-          { name: "ZCZJ", type: "double" },
-          { name: "YYLR", type: "double" },
-          { name: "QMRS", type: "double" },
-          { name: "YYSR", type: "double" }
+          { name: "zczj_sum", type: "double" },
+          { name: "yylr_sum", type: "double" },
+          { name: "qmrs_sum", type: "double" },
+          { name: "yysr_sum", type: "double" }
         ],
         renderer: getRenderer(selectedField.value)
       });

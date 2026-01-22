@@ -1,7 +1,7 @@
 <template>
   <div class="main-content">
     <LeftPanel class="left-panel" :summary-data="apiData" />
-    <MiddleMap class="map-center" @map-select="handleMapSelectChange" />
+    <MiddleMap class="map-center" @map-select="handleMapSelect" />
     <RightPanel class="right-panel" :summary-data="apiData" />
   </div>
 </template>
@@ -19,12 +19,13 @@ const props = defineProps<{
 }>();
 
 const apiData = ref({});
-const currentUniqueCode = ref("");
+const currentAxes = ref({ zxAxis: "", yxAxis: "" });
 const lastRequestSnapshot = ref("");
 
 const fetchData = async (extraParams = {}) => {
   const params = {
-    "uniqueCode": currentUniqueCode.value,
+    "zxAxis": currentAxes.value.zxAxis,
+    "yxAxis": currentAxes.value.yxAxis,
     "area": "",
     "industryDept": "",
     "registerType": "",
@@ -35,30 +36,24 @@ const fetchData = async (extraParams = {}) => {
     ...extraParams
   };
 
-  const currentSnapshot = JSON.stringify(params);
-  if (currentSnapshot === lastRequestSnapshot.value) {
-    console.log("请求参数未变化，拦截重复请求");
-    return; 
-  }
-  
+  // 请求拦截：对比参数无变化则不重复请求
+ const currentSnapshot = JSON.stringify(params);
+  if (currentSnapshot === lastRequestSnapshot.value) return; 
   lastRequestSnapshot.value = currentSnapshot;
 
-  try {
+try {
     const res = await getGsSumDataDisplay(params);
-    if (res && res.data) {
-      apiData.value = res.data;
-    }
+    if (res && res.data) apiData.value = res.data;
   } catch (error) {
-    console.error('获取数据失败:', error);
+    console.error('汇总接口请求失败:', error);
   }
 };
 
-const handleMapSelectChange = (codes: string) => {
-  if (codes === '' && currentUniqueCode.value === "") {
-    return;
-  }
-  currentUniqueCode.value = codes === '' ? "" : codes;
-  fetchData(props.filterParams || {});
+const handleMapSelect = (payload) => {
+  const isEmpty = !payload || (!payload.zxAxis && !payload.yxAxis);
+  if (isEmpty && !currentAxes.value.zxAxis) return;
+  currentAxes.value = payload || { zxAxis: "", yxAxis: "" };
+  fetchData(props.filterParams || {}); 
 };
 
 watch(() => props.filterParams, (newVal) => {

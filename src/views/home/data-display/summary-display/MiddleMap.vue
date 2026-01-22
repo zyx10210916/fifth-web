@@ -26,8 +26,8 @@ export default {
       }
     };
  
-    const handleMapSelect = (codes) => {
-      emit('map-select', codes);
+    const handleMapSelect = (payload) => {
+      emit('map-select', payload); 
     };
  
     watch(() => props.filterParams, (newParams) => {

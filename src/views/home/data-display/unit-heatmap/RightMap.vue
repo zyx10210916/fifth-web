@@ -1,27 +1,16 @@
 <template>
-  <MapView 
-    ref="mapView" 
-    :show-heatmap-option="true"
-    @map-select="handleMapSelect" 
-    @map-loaded="handleMapLoaded"
-    @building-loaded="handlePointsUpdate"
-    @heatmap-visible="val => isHeatmapVisible = val"
-  >
+  <MapView ref="mapView" :show-heatmap-option="true" @map-select="handleMapSelect" @map-loaded="handleMapLoaded"
+    @building-loaded="handlePointsUpdate" @heatmap-visible="val => isHeatmapVisible = val">
     <template #map-overlay>
-      <HeatmapView 
-        v-if="mapIsReady"
-        :view="mapInstance"
-        :modules="mapModules"
-        :points="currentWfsPoints"
-        :visible="isHeatmapVisible"
-      />
+      <HeatmapView v-if="mapIsReady" :view="mapInstance" :modules="mapModules" :points="currentWfsPoints"
+        :visible="isHeatmapVisible" />
     </template>
   </MapView>
 </template>
 
 <script>
 import { ref, shallowRef } from 'vue';
-import { loadModules } from 'esri-loader'; 
+import { loadModules } from 'esri-loader';
 import MapView from '../MapView.vue';
 import HeatmapView from './HeatmapView.vue';
 
@@ -47,65 +36,62 @@ export default {
     const loadEsriModules = async () => {
       const modules = await loadModules([
         'esri/Graphic',
+        'esri/geometry/Point',
         'esri/symbols/SimpleMarkerSymbol'
       ]);
       mapModules.value = modules;
     };
 
+    // 高亮选中单位
     const highlightUnit = async (unit) => {
-  if (!unit || !unit.XZ_AXIS || !unit.YZ_AXIS || !mapView.value) return;
+      const posX = parseFloat(unit.XZ_AXIS);
+      const posY = parseFloat(unit.YZ_AXIS);
 
-  try {
-    if (!mapModules.value) await loadEsriModules();
-    const [Graphic] = mapModules.value;
+      if (!unit || isNaN(posX) || isNaN(posY) || !mapView.value) return;
 
-    // 获取底层 MapView 实例
-    const view = mapView.value.getMapView();
-    if (!view) return;
+      try {
+        if (!mapModules.value) await loadEsriModules();
+        const Graphic = mapModules.value[3];
 
-    // 清除之前的高亮 Graphic
-    if (highlightRef.value) {
-      view.graphics.remove(highlightRef.value);
-    }
+        const view = mapView.value.getMapView();
+        if (!view) return;
 
-    // 构建点几何对象
-    const pointGeometry = {
-      type: "point",
-      x: parseFloat(unit.XZ_AXIS),
-      y: parseFloat(unit.YZ_AXIS),
-      spatialReference: { wkid: 4526 }
-    };
+        if (highlightRef.value) {
+          view.graphics.remove(highlightRef.value);
+        }
 
-    // 创建红色高亮圆点 Graphic
-    const highlightGraphic = new Graphic({
-      geometry: pointGeometry,
-      symbol: {
-        type: "simple-marker",
-        style: "circle",
-        color: [255, 0, 0, 0.9], 
-        size: 10,
-        outline: { color: [255, 255, 255], width: 1 }
-      },
-      attributes: unit 
-    });
+        const pointGeometry = {
+          type: "point",
+          x: posX,
+          y: posY,
+          spatialReference: { wkid: 4526 }
+        };
 
-    // 将高亮层添加到地图
-    view.graphics.add(highlightGraphic);
-    highlightRef.value = highlightGraphic;
+        const highlightGraphic = new Graphic({
+          geometry: pointGeometry,
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: [255, 0, 0, 0.9],
+            size: 10,
+            outline: { color: [255, 255, 255], width: 1 }
+          },
+          attributes: unit
+        });
+        view.graphics.add(highlightGraphic);
+        highlightRef.value = highlightGraphic;
 
-    // 执行飞行缩放 (flyTo 效果)
-    await view.goTo({
-      target: pointGeometry,
-      zoom: 17 
-    }, {
-      duration: 1200,  
-      easing: "ease-in-out"
-    });
+        await view.goTo({
+          target: pointGeometry,
+          zoom: 17
+        }, {
+          duration: 1200,
+          easing: "ease-in-out"
+        });
 
-    // 定位完成后打开信息弹窗
-    view.popup.open({
-      title: unit.B102 || '单位信息',
-      content: `
+        view.popup.open({
+          title: unit.B102 || '单位信息',
+          content: `
         <div style="font-size:14px; line-height: 1.6;">
           <p><b>统一社会信用代码:</b> ${unit.B109 || '-'}</p>
           <p><b>主要业务活动:</b> ${unit.B1031 || '-'}</p>
@@ -113,19 +99,18 @@ export default {
           <p><b>地址:</b> ${unit.B1056 || '-'}</p>
         </div>
       `,
-      location: pointGeometry
-    });
+          location: pointGeometry
+        });
 
-  } catch (error) {
-    console.error("RightMap 高亮执行失败:", error);
-  }
-};
+      } catch (error) {
+        console.error("RightMap 高亮执行失败:", error);
+      }
+    };
 
     const handleMapLoaded = (payload) => {
       mapInstance.value = payload.view;
       mapModules.value = payload.modules;
       mapIsReady.value = true;
-      // 初始加载
       mapView.value.fetchBuildingPoints(props.filterParams);
     };
 
@@ -133,7 +118,10 @@ export default {
       currentWfsPoints.value = data || [];
     };
 
-    const handleMapSelect = (codes) => emit('map-select', codes);
+   const handleMapSelect = (payload) => {
+      emit('map-select', payload); 
+    };
+ 
 
     // 监听筛选
     watch(() => props.filterParams, (newParams) => {

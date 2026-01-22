@@ -67,20 +67,18 @@ const fetchData = async (extraParams = {}) => {
 };
 
 
-const handleStartComparison = async (codesArray: string[]) => {
+const handleStartComparison = async (axisList: any[]) => {
   try {
     const params = {
-      "uniqueCode": codesArray, 
+      "axisDtos": axisList, 
       "area": "", 
       "industryDept": hasUserFilter.value ? props.filterParams.industryDept : "",
     };
     
     const res = await getUniqueCodeList(params);
-    if (res && res.data) {
-      apiData.value = res.data; 
-    }
+    if (res && res.data) apiData.value = res.data;
   } catch (error) {
-    console.error('对比失败:', error);
+    console.error('比对接口请求失败:', error);
   }
 };
 

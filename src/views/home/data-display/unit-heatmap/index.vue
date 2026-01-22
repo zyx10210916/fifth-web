@@ -1,5 +1,5 @@
 <template>
-  <div class="main-content-layout">
+  <div class="main-content">
     <LeftPanel 
       class="left-list"
       :list-data="unitListData"
@@ -13,7 +13,7 @@
       :selected-unit="selectedUnit"
       :filter-params="effectiveFilterParams"
       :loading="mapLoading"
-      @map-select="handleMapClickQuery"  
+      @map-select="handleMapSelect"  
     />
   </div>
 </template>
@@ -38,27 +38,40 @@ const unitListData = ref({
 
 const listLoading = ref(false);
 const mapLoading = ref(false);
-const currentUniqueCode = ref<string | null>(null);
+const currentAxes = ref({ zxAxis: "", yxAxis: "" });
+const lastRequestSnapshot = ref("");
 
 const effectiveFilterParams = computed(() => ({
   ...props.filterParams,
-  uniqueCode: currentUniqueCode.value 
+  zxAxis: currentAxes.value.zxAxis,
+  yxAxis: currentAxes.value.yxAxis
 }));
 
-const handleMapClickQuery = (codes: string) => {
-  currentUniqueCode.value = codes === 'none' ? null : codes;
+const handleMapSelect = (payload: any) => {
+  const isEmpty = !payload || (!payload.zxAxis && !payload.yxAxis);
+  if (isEmpty && !currentAxes.value.zxAxis) return;
+
+  currentAxes.value = payload || { zxAxis: "", yxAxis: "" };
   fetchUnitList(1);
 };
 
 const fetchUnitList = async (pageNum = 1) => {
-  listLoading.value = true;
-  try {
-    const res = await getUnitHeatMap({
-      pageNo: pageNum,
-      pageSize: 20,
-      ...effectiveFilterParams.value
-    });
+  const params = {
+    pageNo: pageNum,
+    pageSize: 20,
+    ...effectiveFilterParams.value
+  };
 
+  const currentSnapshot = JSON.stringify(params);
+  if (currentSnapshot === lastRequestSnapshot.value) {
+    return; 
+  }
+  
+  lastRequestSnapshot.value = currentSnapshot;
+  listLoading.value = true;
+
+  try {
+    const res = await getUnitHeatMap(params);
     if (res?.data) {
       unitListData.value = {
         list: res.data.list || [],
@@ -75,9 +88,7 @@ const fetchUnitList = async (pageNum = 1) => {
 };
 
 const handleRowClick = (row: any) => {
-  selectedUnit.value = {
-    ...row
-  };
+  selectedUnit.value = { ...row };
 };
 
 const handlePageChange = (page: number) => {
@@ -94,7 +105,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.main-content-layout {
+.main-content {
   display: flex;
   height: 100%;    
   width: 100%;

@@ -240,7 +240,7 @@ export default {
     // 高亮选中及发送查询逻辑
     const querySelectedPoints = async (geometry) => {
       const bldCfg = MAP_CONFIG.economic.building;
-      const buildingLayer = props.view.map.findLayerById(bldCfg.id); 
+      const buildingLayer = props.view.map.findLayerById(bldCfg.id);
       const highlightStyle = MAP_CONFIG.styles.highlightPoint;
 
       if (!buildingLayer) return;
@@ -248,75 +248,77 @@ export default {
       try {
         if (!modules.value.Point) await initModules();
         const { Graphic, geometryEngine, Point } = modules.value;
-        const layerView = await props.view.whenLayerView(buildingLayer);
         const viewSR = props.view.spatialReference;
 
-        // --- 获取数据 ---
+        // 1. 获取 BBOX 范围内的全量原始数据
         const ext = geometry.extent;
         const bbox = `${ext.xmin},${ext.ymin},${ext.xmax},${ext.ymax}`;
         const response = await fetch(bldCfg.getWfsUrl(bbox));
         const geojson = await response.json();
         const candidates = geojson.features || [];
 
-        // --- 过滤逻辑 ---
-        const featuresInPoly = candidates.filter(f => {
-          const pt = new Point({
-            x: Number(f.geometry.coordinates[0]),
-            y: Number(f.geometry.coordinates[1]),
-            spatialReference: viewSR
-          });
-          return geometryEngine.contains(geometry, pt);
-        });
+        // 2. 空间过滤与字段解析
+        const renderMap = new Map();
+        const xAxisList = []; // 存储 zxAxis 字符串数组
+        const yAxisList = []; // 存储 yxAxis 字符串数组
+        let recordCount = 0;
 
-        // --- 清理逻辑 ---
-        if (!props.appendMode) {
-          measureLayer.value.removeAll();
-          const rectGraphic = new Graphic({
-            geometry: geometry,
-            symbol: MAP_CONFIG.styles.selectionRect 
-          });
-          measureLayer.value.add(rectGraphic);
-        } else {
-        }
-
-        // ---  渲染高亮点 ---
-        const coordinateMap = new Map();
-        const allSelectedWyms = [];
-
-        featuresInPoly.forEach(f => {
-          const wym = f.properties.WYM;
-          if (!wym) return;
-          allSelectedWyms.push(wym);
-
+        candidates.forEach(f => {
+          // 仍然需要 geometry 用作空间判断（判断是否在拉框范围内）
           const x = Number(f.geometry.coordinates[0]);
           const y = Number(f.geometry.coordinates[1]);
-          const geoKey = `${x.toFixed(6)},${y.toFixed(6)}`;
+          const pt = new Point({ x, y, spatialReference: viewSR });
 
-          if (!coordinateMap.has(geoKey)) {
-            coordinateMap.set(geoKey, {
-              geometry: new Point({ x, y, spatialReference: viewSR }),
-              wyms: [wym]
-            });
-          } else {
-            coordinateMap.get(geoKey).wyms.push(wym);
+          if (geometryEngine.contains(geometry, pt)) {
+            recordCount++;
+
+            // --- 核心修改：解析“坐标”属性字段 ---
+            // 假设字段名为 "坐标"，格式为 "x,y"
+            const coordStr = f.properties["坐标"] || "";
+            if (coordStr && coordStr.includes(',')) {
+              const [zx, yx] = coordStr.split(',');
+              xAxisList.push(zx.trim());
+              yAxisList.push(yx.trim());
+            } else {
+              // 如果该字段异常，降级使用经纬度保证业务不中断
+              xAxisList.push(x.toFixed(6));
+              yAxisList.push(y.toFixed(6));
+            }
+
+            // 渲染去重逻辑：同一个位置只画一个点
+            const geoKey = `${x.toFixed(6)},${y.toFixed(6)}`;
+            if (!renderMap.has(geoKey)) {
+              renderMap.set(geoKey, pt);
+            }
           }
         });
 
-        // 发送代码
-        emit('select-complete', [...new Set(allSelectedWyms)].join(','));
-
-        // 绘制高亮点
-        coordinateMap.forEach((data) => {
+        // 3. 视觉渲染 (保持原样)
+        if (!props.appendMode) {
+          measureLayer.value.removeAll();
           measureLayer.value.add(new Graphic({
-            geometry: data.geometry,
-            symbol: highlightStyle,
-            attributes: { wyms: data.wyms }
+            geometry: geometry,
+            symbol: MAP_CONFIG.styles.selectionRect
+          }));
+        }
+
+        renderMap.forEach((pt) => {
+          measureLayer.value.add(new Graphic({
+            geometry: pt,
+            symbol: highlightStyle
           }));
         });
 
-        console.log(`[统一查询模式] 选中记录: ${allSelectedWyms.length}, 渲染坐标点: ${coordinateMap.size}`);
+        // 4. 业务数据下发：拼接为逗号分隔的字符串
+        emit('select-complete', {
+          zxAxis: xAxisList.join(','),
+          yxAxis: yAxisList.join(',')
+        });
+
+        console.log(`[坐标解析模式] 选中记录数: ${recordCount}, 解析坐标对: ${xAxisList.length}, 渲染物理点: ${renderMap.size}`);
+
       } catch (err) {
-        console.error("MapTools 查询失败:", err);
+        console.error("MapTools 属性坐标查询失败:", err);
       }
     };
     onUnmounted(() => {

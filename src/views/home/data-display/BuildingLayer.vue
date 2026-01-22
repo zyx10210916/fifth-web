@@ -17,10 +17,10 @@ export default {
     const isLoading = ref(false);
     const useWFS = ref(false);
     const isViewReady = ref(false);
-    
-    let abortController = null; 
-    const loadedKeys = new Set(); 
-    let lastRequestExtent = null; 
+
+    let abortController = null;
+    const loadedKeys = new Set();
+    let lastRequestExtent = null;
 
     // 引用
     const bldCfg = MAP_CONFIG.economic.building;
@@ -31,14 +31,14 @@ export default {
 
     const debouncedHandleViewChange = debounce(() => {
       if (!isViewReady.value || !props.view) return;
-      
+
       const currentScale = props.view.scale;
       const isCloseEnough = currentScale > 0 && currentScale <= bldCfg.maxScale;
 
       if (isCloseEnough && !useWFS.value) {
         useWFS.value = true;
         updateLayersVisibility();
-        fetchBuildingPoints(); 
+        fetchBuildingPoints();
       } else if (!isCloseEnough && useWFS.value) {
         useWFS.value = false;
         if (abortController) abortController.abort();
@@ -60,7 +60,7 @@ export default {
         url: bldCfg.wmsUrl,
         sublayers: [{ name: bldCfg.layerName, queryable: true }],
         customParameters: { "TRANSPARENT": "true", "VERSION": "1.1.0", "SRS": "EPSG:4526" },
-        visible: !useWFS.value && props.visible 
+        visible: !useWFS.value && props.visible
       }));
       props.view.map.add(wmsLayer.value);
     };
@@ -72,12 +72,12 @@ export default {
         objectIdField: "ObjectId",
         geometryType: "point",
         spatialReference: { wkid: 4526 },
-        source: [], 
+        source: [],
         fields: [
           { name: "ObjectId", type: "oid" },
           { name: "WYM", type: "string" }
         ],
-        renderer: { type: "simple", symbol: bldCfg.symbol }, 
+        renderer: { type: "simple", symbol: bldCfg.symbol },
         visible: useWFS.value && props.visible,
         outFields: ["*"]
       }));
@@ -99,22 +99,30 @@ export default {
         const paddedExt = ext.clone().expand(1.5);
         lastRequestExtent = paddedExt;
         const bbox = `${paddedExt.xmin},${paddedExt.ymin},${paddedExt.xmax},${paddedExt.ymax},EPSG:4526`;
-        const url = bldCfg.getWfsUrl(bbox); 
-        
+        const url = bldCfg.getWfsUrl(bbox);
         const response = await fetch(url, { signal: abortController.signal });
         const geojson = await response.json();
-        const features = (geojson.features || []).filter(f => !loadedKeys.has(f.properties.WYM));
-        
-        if (features.length === 0) return;
+        const features = (geojson.features || []).filter(f => {
+          const key = `${f.geometry.coordinates[0]},${f.geometry.coordinates[1]}`;
+          return !loadedKeys.has(key);
+        });
 
+        if (features.length === 0) return;
         const chunkSize = 2000;
         for (let i = 0; i < features.length; i += chunkSize) {
-          if (abortController.signal.aborted) break;
           const graphics = features.slice(i, i + chunkSize).map(f => {
-            loadedKeys.add(f.properties.WYM);
+            const key = `${f.geometry.coordinates[0]},${f.geometry.coordinates[1]}`;
+            loadedKeys.add(key);
             return new Graphic({
-              geometry: { type: "point", x: f.geometry.coordinates[0], y: f.geometry.coordinates[1], spatialReference: { wkid: 4526 } },
-              attributes: { ObjectId: Date.now() + Math.random(), WYM: f.properties.WYM }
+              geometry: {
+                type: "point",
+                x: f.geometry.coordinates[0],
+                y: f.geometry.coordinates[1],
+                spatialReference: { wkid: 4526 }
+              },
+              attributes: {
+                ObjectId: Date.now() + Math.random(),
+              }
             });
           });
           await layerInstance.value.applyEdits({ addFeatures: graphics });
@@ -135,8 +143,8 @@ export default {
           initWMSLayer();
           initFeatureLayer();
           props.view.watch('scale', debouncedHandleViewChange);
-          props.view.watch('extent', debouncedHandleViewChange); 
-          debouncedHandleViewChange(); 
+          props.view.watch('extent', debouncedHandleViewChange);
+          debouncedHandleViewChange();
         } else {
           const tempWatch = props.view.watch("scale", (s) => {
             if (s > 0) { tempWatch.remove(); init(); }
