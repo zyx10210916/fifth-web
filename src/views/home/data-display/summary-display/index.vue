@@ -50,10 +50,8 @@ try {
 };
 
 const handleMapSelect = (payload) => {
-  const isEmpty = !payload || (!payload.zxAxis && !payload.yxAxis);
-  if (isEmpty && !currentAxes.value.zxAxis) return;
   currentAxes.value = payload || { zxAxis: "", yxAxis: "" };
-  fetchData(props.filterParams || {});
+  fetchData(props.filterParams || {}); 
 };
 
 watch(() => props.filterParams, (newVal) => {

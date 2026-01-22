@@ -7,7 +7,7 @@ import yxtNormal from "@/assets/images/yxt-1.png";
 import yxtActive from "@/assets/images/yxt-2.png";
 
 const GEOSERVER_BASE = "http://10.44.58.28:8089/geoserver/workspace";
-const LAYER_BUILDING = "dataCenterWorkspace:juheshujupc38";
+const LAYER_BUILDING = "workspace:juheshujupc38";
 
 export const MAP_CONFIG = {
   // ArcGIS API 基础配置

@@ -47,10 +47,7 @@ const effectiveFilterParams = computed(() => ({
   yxAxis: currentAxes.value.yxAxis
 }));
 
-const handleMapSelect = (payload: any) => {
-  const isEmpty = !payload || (!payload.zxAxis && !payload.yxAxis);
-  if (isEmpty && !currentAxes.value.zxAxis) return;
-
+const handleMapSelect = (payload) => {
   currentAxes.value = payload || { zxAxis: "", yxAxis: "" };
   fetchUnitList(1);
 };

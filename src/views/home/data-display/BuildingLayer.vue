@@ -75,7 +75,7 @@ export default {
         source: [],
         fields: [
           { name: "ObjectId", type: "oid" },
-          { name: "WYM", type: "string" }
+          { name: "坐标", type: "string" }
         ],
         renderer: { type: "simple", symbol: bldCfg.symbol },
         visible: useWFS.value && props.visible,
