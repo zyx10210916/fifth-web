@@ -85,7 +85,7 @@ export default {
       destroyActiveTools();
       activeTool.value = null;
       if (shouldNotify) {
-        emit('select-complete', '');
+        emit('map-select', '');
       }
     };
 
@@ -238,9 +238,6 @@ export default {
     };
 
     // 高亮选中及发送查询逻辑
-
-    // data-display/MapTools.vue
-
     const querySelectedPoints = async (geometry) => {
       const bldCfg = MAP_CONFIG.economic.building;
       const buildingLayer = props.view.map.findLayerById(bldCfg.id);
@@ -267,7 +264,7 @@ export default {
         let recordCount = 0;
 
         candidates.forEach(f => {
-          // 仍然需要 geometry 用作空间判断（判断是否在拉框范围内）
+          //  通过geometry判断是否在拉框范围内
           const x = Number(f.geometry.coordinates[0]);
           const y = Number(f.geometry.coordinates[1]);
           const pt = new Point({ x, y, spatialReference: viewSR });
@@ -275,15 +272,14 @@ export default {
           if (geometryEngine.contains(geometry, pt)) {
             recordCount++;
 
-            // --- 核心修改：解析“坐标”属性字段 ---
-            // 字段名为 "坐标"，格式为 "x,y"
+            // --- 解析“坐标”属性字段 ---
             const coordStr = f.properties["坐标"] || "";
             if (coordStr && coordStr.includes(',')) {
               const [zx, yx] = coordStr.split(',');
               xAxisList.push(zx.trim());
               yAxisList.push(yx.trim());
             } else {
-              // 如果该字段异常，降级使用经纬度保证业务不中断
+              // 如果该字段异常，使用经纬度保证业务不中断
               xAxisList.push(x.toFixed(6));
               yAxisList.push(y.toFixed(6));
             }
@@ -296,7 +292,7 @@ export default {
           }
         });
 
-        // 3. 视觉渲染 (保持原样)
+        // 3. 视觉渲染 
         if (!props.appendMode) {
           measureLayer.value.removeAll();
           measureLayer.value.add(new Graphic({
@@ -313,7 +309,7 @@ export default {
         });
 
         // 4. 业务数据下发：拼接为逗号分隔的字符串
-        emit('select-complete', {
+        emit('map-select', {
           zxAxis: xAxisList.join(','),
           yxAxis: yAxisList.join(',')
         });
