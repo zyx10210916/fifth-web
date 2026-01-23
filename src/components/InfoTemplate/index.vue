@@ -241,7 +241,7 @@
   />
   <CombinedConditionModal :indexQueryDate="indexQueryDate" :columnQueries="columnQueries" @handleOk="handleOk"
                           v-model:visible="combinedModalVisible" />
-  <SummaryModal v-model:visible="summaryModalVisible" @select="handleSummarySelect" />
+  <SummaryModal v-model:visible="summaryModalVisible" @select="handleSummarySelect" :currentSumCode="searchForm.sumCode" />
 
   <!-- 导出选项模态框 -->
   <ExportModal
@@ -714,6 +714,8 @@ const showSummaryModal = () => {
 const handleSummarySelect = (code) => {
   console.log('Selected summary code:', code);
   searchForm.sumCode = code;
+  console.log('After setting sumCode, searchForm:', searchForm);
+  console.log('After setting sumCode, getDataData:', getDataData);
   // 可以在这里触发查询或其他操作
 };
 
@@ -1328,6 +1330,12 @@ const handleQueryTemplateChange = (value: string, option: any) => {
       searchForm.operator = parsedConditions.operator;
     }
 
+    // 应用模板中的汇总口径
+    if (parsedConditions.sumCode) {
+      searchForm.sumCode = parsedConditions.sumCode;
+      getDataData.sumCode = parsedConditions.sumCode;
+    }
+
     // 执行查询
     getQuery();
     message.success('查询模板应用成功');
@@ -1346,7 +1354,8 @@ const handleReset = () => {
     // 重置搜索表单到初始状态
     Object.assign(searchForm,{
       ...defaultForm,
-      currentReport: props.TABLE_CODE || ''
+      currentReport: props.TABLE_CODE || '',
+      sumCode: ''
     });
 
     // 重置组合查询条件
@@ -1380,7 +1389,8 @@ const handleReset = () => {
       sortField: '',
       sortOrder: '',
       derivativeColumn: props.derivativeFormula || '',
-      derivativeTable: props.derivativeTable || ''
+      derivativeTable: props.derivativeTable || '',
+      sumCode: ''
     });
 
     // 调用init函数重新加载数据

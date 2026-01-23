@@ -1,13 +1,13 @@
 <!-- src/components/InfoTemplate/SummaryModal.vue -->
 <template>
-  <a-modal :open="visible" title="常用汇总口径" @ok="handleOk" @cancel="handleCancel" :footer="null" width="600px" :mask-closable="true">
+  <a-modal :open="visible" title="常用汇总口径" @ok="handleOk" @cancel="handleCancel" width="600px" :mask-closable="true" ok-text="确认" cancel-text="取消">
     <div class="summary-container">
       <a-table
           :columns="columns"
           :data-source="dataSource"
           :pagination="false"
           size="small"
-          :row-selection="{ type: 'radio', selectedRowKeys: selectedRowKeys, onChange: onSelectChange }"
+          :row-selection="{ type: 'checkbox', selectedRowKeys: selectedRowKeys, onChange: onSelectChange }"
       >
         <template #bodyCell="{ column, text }">
           <template v-if="column.dataIndex === 'name'">
@@ -20,15 +20,45 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
   visible: '',
+  currentSumCode: {
+    type: String,
+    default: ''
+  }
 })
 
 const emit = defineEmits(['update:visible', 'select']);
 
 const selectedRowKeys = ref([]);
+
+// 根据currentSumCode设置选中状态
+const setSelectedRowKeysBySumCode = (sumCode) => {
+  if (sumCode) {
+    const item = dataSource.find(item => item.code === sumCode);
+    if (item) {
+      selectedRowKeys.value = [item.key];
+    } else {
+      selectedRowKeys.value = [];
+    }
+  } else {
+    selectedRowKeys.value = [];
+  }
+};
+
+// 监听currentSumCode变化
+watch(() => props.currentSumCode, (newSumCode) => {
+  setSelectedRowKeysBySumCode(newSumCode);
+});
+
+// 监听visible变化，当组件显示时设置初始选中状态
+watch(() => props.visible, (newVisible) => {
+  if (newVisible) {
+    setSelectedRowKeysBySumCode(props.currentSumCode);
+  }
+});
 
 const columns = [
   {
@@ -83,19 +113,25 @@ const handleOk = () => {
 };
 
 const handleCancel = () => {
-  if (selectedRowKeys.value.length > 0) {
-    const selectedKey = selectedRowKeys.value[0];
-    const selectedItem = dataSource.find(item => item.key === selectedKey);
-    if (selectedItem) {
-      emit('select', selectedItem.code);
-    }
-  }
   emit('update:visible', false);
 };
 
-const onSelectChange = (keys) => {
-  selectedRowKeys.value = keys;
+const onSelectChange = (selectedRowKeysArr) => {
+  // 实现单选逻辑
+  if (selectedRowKeysArr.length > 1) {
+    // 如果选择了多项，只保留最后一项
+    selectedRowKeys.value = [selectedRowKeysArr[selectedRowKeysArr.length - 1]];
+  } else {
+    // 如果点击的是已选中的项，则取消选中
+    if (selectedRowKeysArr.length === 1 && selectedRowKeys.value.length === 1 && selectedRowKeysArr[0] === selectedRowKeys.value[0]) {
+      selectedRowKeys.value = [];
+    } else {
+      selectedRowKeys.value = selectedRowKeysArr;
+    }
+  }
 };
+
+
 </script>
 
 <style lang="less" scoped>
