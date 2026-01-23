@@ -12,6 +12,8 @@ export default {
   },
   emits: ['loaded'],
   setup(props, { emit, expose }) {
+    const LOAD_MODE = 'full'; // 全量加载模式
+
     const layerInstance = shallowRef(null);
     const wmsLayer = shallowRef(null);
     const isLoading = ref(false);
@@ -22,50 +24,99 @@ export default {
     const loadedKeys = new Set();
     let lastRequestExtent = null;
 
-    // 引用
     const bldCfg = MAP_CONFIG.economic.building;
 
-    const shouldFetchNewData = (currentExtent) => {
-      return !lastRequestExtent || !lastRequestExtent.contains(currentExtent);
-    };
-
-    const debouncedHandleViewChange = debounce(() => {
-      if (!isViewReady.value || !props.view) return;
-
-      const currentScale = props.view.scale;
-      const isCloseEnough = currentScale > 0 && currentScale <= bldCfg.maxScale;
-
-      if (isCloseEnough && !useWFS.value) {
-        useWFS.value = true;
-        updateLayersVisibility();
-        fetchBuildingPoints();
-      } else if (!isCloseEnough && useWFS.value) {
-        useWFS.value = false;
-        if (abortController) abortController.abort();
-        updateLayersVisibility();
-      } else if (useWFS.value && shouldFetchNewData(props.view.extent)) {
-        fetchBuildingPoints();
-      }
-    }, 400);
-
-    const updateLayersVisibility = () => {
-      if (wmsLayer.value) wmsLayer.value.visible = !useWFS.value && props.visible;
-      if (layerInstance.value) layerInstance.value.visible = useWFS.value && props.visible;
-    };
-
+    // --- 初始化 WMS 占位图层 ---
     const initWMSLayer = () => {
       const WMSLayer = props.modules[10];
       wmsLayer.value = markRaw(new WMSLayer({
         id: "building_wms",
         url: bldCfg.wmsUrl,
-        sublayers: [{ name: bldCfg.layerName, queryable: true }],
+        sublayers: [{ name: bldCfg.layerName }],
         customParameters: { "TRANSPARENT": "true", "VERSION": "1.1.0", "SRS": "EPSG:4526" },
-        visible: !useWFS.value && props.visible
+        visible: props.visible && !useWFS.value
       }));
       props.view.map.add(wmsLayer.value);
     };
 
-    const initFeatureLayer = () => {
+    // --- 全量加载模式：分批注入 FeatureLayer ---
+    const initFullMode = async () => {
+      const FeatureLayer = props.modules[2];
+      const Graphic = props.modules[3];
+      if (!FeatureLayer || !Graphic) return;
+
+      // 构造 URL：复用配置逻辑并去掉 bbox 参数
+      const finalUrl = bldCfg.getWfsUrl("").replace("&bbox=", "") + "&propertyName=the_geom,坐标";
+
+      try {
+        isLoading.value = true;
+        const response = await fetch(finalUrl);
+        const geojson = await response.json();
+        const features = geojson.features || [];
+
+        // 1. 创建原生 4526 坐标系的 FeatureLayer
+        layerInstance.value = markRaw(new FeatureLayer({
+          id: bldCfg.id,
+          source: [],
+          objectIdField: "ObjectId",
+          geometryType: "point",
+          fields: [
+            { name: "ObjectId", type: "oid" },
+            { name: "坐标", type: "string" }
+          ],
+          renderer: {
+            type: "simple",
+            symbol: bldCfg.symbol
+          },
+          spatialReference: { wkid: 4526 },
+          visible: true,
+          outFields: ["*"]
+        }));
+
+        props.view.map.add(layerInstance.value);
+
+        // 等待 LayerView 准备就绪
+        await props.view.whenLayerView(layerInstance.value);
+
+        // 2. 分批注入数据，确保坐标为数值类型
+        const chunkSize = 5000;
+        for (let i = 0; i < features.length; i += chunkSize) {
+          const chunk = features.slice(i, i + chunkSize);
+          const graphics = chunk.map((f, index) => {
+            const x = parseFloat(f.geometry.coordinates[0]);
+            const y = parseFloat(f.geometry.coordinates[1]);
+
+            if (isNaN(x) || isNaN(y)) return null;
+
+            return new Graphic({
+              geometry: {
+                type: "point",
+                x: x,
+                y: y,
+                spatialReference: { wkid: 4526 }
+              },
+              attributes: {
+                ObjectId: i + index + 1,
+                "坐标": f.properties["坐标"] || ""
+              }
+            });
+          }).filter(g => g !== null);
+
+          await layerInstance.value.applyEdits({ addFeatures: graphics });
+        }
+
+        // 3. 渲染完成后隐藏 WMS
+        useWFS.value = true;
+        if (wmsLayer.value) wmsLayer.value.visible = false;
+        isLoading.value = false;
+
+      } catch (error) {
+        isLoading.value = false;
+      }
+    };
+
+    // --- 动态 BBOX 模式 ---
+    const initBboxMode = () => {
       const FeatureLayer = props.modules[2];
       layerInstance.value = markRaw(new FeatureLayer({
         id: bldCfg.id,
@@ -73,97 +124,73 @@ export default {
         geometryType: "point",
         spatialReference: { wkid: 4526 },
         source: [],
-        fields: [
-          { name: "ObjectId", type: "oid" },
-          { name: "坐标", type: "string" }
-        ],
+        fields: [{ name: "ObjectId", type: "oid" }, { name: "坐标", type: "string" }],
         renderer: { type: "simple", symbol: bldCfg.symbol },
-        visible: useWFS.value && props.visible,
-        outFields: ["*"]
+        visible: false
       }));
       props.view.map.add(layerInstance.value);
+      props.view.watch('extent', debouncedHandleViewChange);
     };
 
-    const fetchBuildingPoints = async () => {
+    const fetchBuildingPointsBBox = async () => {
       if (!layerInstance.value || !useWFS.value) return;
       if (abortController) abortController.abort();
       abortController = new AbortController();
-
       isLoading.value = true;
       try {
-        const Graphic = props.modules.find(m => m.name === 'Graphic' || m.prototype?.declaredClass === "esri.Graphic");
+        const Graphic = props.modules[3];
         const ext = props.view.extent;
-        if (!ext) return;
-
-        // 外扩缓冲区并获取 URL
         const paddedExt = ext.clone().expand(1.5);
         lastRequestExtent = paddedExt;
         const bbox = `${paddedExt.xmin},${paddedExt.ymin},${paddedExt.xmax},${paddedExt.ymax},EPSG:4526`;
-        const url = bldCfg.getWfsUrl(bbox);
+        const url = `${bldCfg.getWfsUrl(bbox)}&propertyName=the_geom,${encodeURIComponent('坐标')}`;
         const response = await fetch(url, { signal: abortController.signal });
         const geojson = await response.json();
         const features = (geojson.features || []).filter(f => {
           const key = `${f.geometry.coordinates[0]},${f.geometry.coordinates[1]}`;
           return !loadedKeys.has(key);
         });
-
         if (features.length === 0) return;
-        const chunkSize = 2000;
-        for (let i = 0; i < features.length; i += chunkSize) {
-          const graphics = features.slice(i, i + chunkSize).map(f => {
-            const key = `${f.geometry.coordinates[0]},${f.geometry.coordinates[1]}`;
-            loadedKeys.add(key);
-            return new Graphic({
-              geometry: {
-                type: "point",
-                x: f.geometry.coordinates[0],
-                y: f.geometry.coordinates[1],
-                spatialReference: { wkid: 4526 }
-              },
-              attributes: {
-                ObjectId: Date.now() + Math.random(),
-              }
-            });
+        const graphics = features.map(f => {
+          loadedKeys.add(`${f.geometry.coordinates[0]},${f.geometry.coordinates[1]}`);
+          return new Graphic({
+            geometry: { type: "point", x: f.geometry.coordinates[0], y: f.geometry.coordinates[1], spatialReference: { wkid: 4526 } },
+            attributes: { ObjectId: Date.now() + Math.random() }
           });
-          await layerInstance.value.applyEdits({ addFeatures: graphics });
-          await new Promise(r => setTimeout(r, 16));
-        }
-        emit('loaded', geojson.features);
+        });
+        await layerInstance.value.applyEdits({ addFeatures: graphics });
       } catch (e) {
-        if (e.name !== 'AbortError') console.error("[BuildingLayer] Error:", e);
-      } finally {
         isLoading.value = false;
-      }
+      } finally { isLoading.value = false; }
     };
+
+    const debouncedHandleViewChange = debounce(() => {
+      if (!isViewReady.value || LOAD_MODE !== 'bbox') return;
+      const isCloseEnough = props.view.scale > 0 && props.view.scale <= bldCfg.maxScale;
+      if (isCloseEnough && !useWFS.value) {
+        useWFS.value = true;
+        if (wmsLayer.value) wmsLayer.value.visible = false;
+        if (layerInstance.value) layerInstance.value.visible = true;
+        fetchBuildingPointsBBox();
+      } else if (useWFS.value && (!lastRequestExtent || !lastRequestExtent.contains(props.view.extent))) {
+        fetchBuildingPointsBBox();
+      }
+    }, 400);
 
     const init = () => {
       props.view.when(() => {
-        if (props.view.scale > 0) {
-          isViewReady.value = true;
-          initWMSLayer();
-          initFeatureLayer();
-          props.view.watch('scale', debouncedHandleViewChange);
-          props.view.watch('extent', debouncedHandleViewChange);
-          debouncedHandleViewChange();
-        } else {
-          const tempWatch = props.view.watch("scale", (s) => {
-            if (s > 0) { tempWatch.remove(); init(); }
-          });
-        }
+        isViewReady.value = true;
+        initWMSLayer();
+        if (LOAD_MODE === 'full') initFullMode();
+        else initBboxMode();
       });
     };
-
-    watch(() => props.visible, (val) => {
-      if (!val) { loadedKeys.clear(); lastRequestExtent = null; }
-      updateLayersVisibility();
-    });
 
     onMounted(init);
     onUnmounted(() => {
       abortController?.abort();
       if (layerInstance.value) props.view.map.remove(layerInstance.value);
       if (wmsLayer.value) props.view.map.remove(wmsLayer.value);
-      loadedKeys.clear();
     });
 
     expose({
