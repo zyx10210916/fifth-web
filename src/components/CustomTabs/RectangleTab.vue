@@ -21,7 +21,11 @@
           </div>
         </div>
         <template #overlay>
-          <a-menu @click="(e) => handleDropdownClick(e, item)">
+          <a-menu
+              @click="(e) => handleDropdownClick(e, item)"
+              :selected-keys="props.selectedSumCode ? [props.selectedSumCode] : []"
+              mode="radio"
+          >
             <a-menu-item v-for="child in item.children" :key="child.key">
               {{ child.title }}
             </a-menu-item>
@@ -57,11 +61,13 @@ interface Props {
   list: ListItem[];
   className?: string;
   clickable?: boolean;
+  selectedSumCode?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   list: () => [] as ListItem[],
   clickable: false,
+  selectedSumCode: '',
 });
 
 const emit = defineEmits(['click:item', 'click:dropdown', 'reset:items']);
@@ -145,7 +151,7 @@ defineExpose({ resetItems });
         left: 50%;
         transform: translate(-50%, -50%);
         width: 100%;
-        height: 25px;
+        height: 24px;
         border-radius: 4px;
         background: rgba(84, 111, 255, 1);
         border-radius: 4px;

@@ -175,6 +175,7 @@
             @click:item="handleOverviewItem"
             @click:dropdown="handleDropdownClick"
             :tabList="tabsConfig"
+            :selectedSumCode="selectedSumCode"
         />
 
         <!-- 简化表格渲染 -->
@@ -1888,9 +1889,16 @@ const executeSummary = async (): Promise<void> => {
     }
 
     // 构建接口参数并请求数据
-    const params: FindQuickSumaryParams = {
+    const params: any = {
       summaryQueries: summaryQueries
     };
+
+    // 如果有选中的汇总口径，添加sumCode字段
+    if (selectedSumCode.value) {
+      params.sumCode = selectedSumCode.value;
+      params.whereSql = "";
+      console.log('Added sumCode to params:', selectedSumCode.value);
+    }
 
     console.log('param', params.summaryQueries);
 
@@ -2138,11 +2146,15 @@ const handleOverviewItem = (item: any): void => {
   }
 };
 
+// 新增：存储选中的汇总口径
+const selectedSumCode = ref('');
+
 /**
  * @desc: 处理常用汇总口径下拉菜单点击
  */
 const handleDropdownClick = (e: any, parentItem: any): void => {
   console.log('Dropdown clicked:', e, parentItem);
+  selectedSumCode.value = e.key;
   message.info(`您选择了${e.key}汇总口径`);
 };
 

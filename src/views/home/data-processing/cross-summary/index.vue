@@ -241,7 +241,7 @@
 
       <!-- 表格 -->
       <div class="table-container">
-        <RectangleTab :list="tabsConfig" :clickable="true" @click:item="handleOverviewItem" @click:dropdown="handleDropdownClick" :tabList="tabsConfig"/>
+        <RectangleTab :list="tabsConfig" :clickable="true" @click:item="handleOverviewItem" @click:dropdown="handleDropdownClick" :tabList="tabsConfig" :selectedSumCode="selectedSumCode"/>
 
         <a-table
             :dataSource="tableDataSource"
@@ -2250,12 +2250,22 @@ const executeSummary = async () => {
     const subGroupFields = [...checkedSystemForSubGroup.map(item => item.key), ...normalSideList.value.filter(item => item.key !== 'total').map(item => item.key)];
 
     // 将每个tableConfig包装到tableQueries中
-    const crosssumQueries = summaryQueries.map(tableConfig => ({
-      tableQueries: [{
-        ...tableConfig,
-        subGroupFields: subGroupFields
-      }]
-    }));
+    const crosssumQueries = summaryQueries.map(tableConfig => {
+      const queryObj = {
+        tableQueries: [{
+          ...tableConfig,
+          subGroupFields: subGroupFields
+        }]
+      };
+
+      // 如果有选中的汇总口径，添加sumCode字段到每个查询对象中
+      if (selectedSumCode.value) {
+        queryObj.sumCode = selectedSumCode.value;
+        console.log('Added sumCode to cross summary query:', selectedSumCode.value);
+      }
+
+      return queryObj;
+    });
 
     const params = {
       crossSumQueries: crosssumQueries
@@ -2474,9 +2484,12 @@ const handleOverviewItem = (item: any) => {
   }
 };
 
+// 新增：存储选中的汇总口径
+const selectedSumCode = ref('');
+
 const handleDropdownClick = (e: any, parentItem: any) => {
   console.log('Dropdown clicked:', e, parentItem);
-  // 这里可以添加具体的汇总口径处理逻辑
+  selectedSumCode.value = e.key;
   message.info(`您选择了${e.key}汇总口径`);
 };
 // ======================== 表格逻辑 E ========================
