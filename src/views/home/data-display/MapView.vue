@@ -142,8 +142,7 @@ export default {
 
         const map = new Map({
           basemap: new Basemap({
-            // baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
-            baseLayers: null,
+            baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
             id: "street"
           })
         });
@@ -160,7 +159,7 @@ export default {
           mapIsReady.value = true;
           await nextTick();
           // 加载边界
-          // await loadBoundaryLayers(map);
+          await loadBoundaryLayers(map);
 
           // 加载房屋面
           await loadHouseLayer();

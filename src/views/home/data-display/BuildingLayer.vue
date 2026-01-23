@@ -13,18 +13,23 @@ export default {
   emits: ['loaded'],
   setup(props, { emit, expose }) {
     const LOAD_MODE = 'full'; // 全量加载模式
-
     const layerInstance = shallowRef(null);
     const wmsLayer = shallowRef(null);
     const isLoading = ref(false);
     const useWFS = ref(false);
     const isViewReady = ref(false);
-
-    let abortController = null;
+    const hasLoaded = ref(false);
+    const bldCfg = MAP_CONFIG.economic.building;
     const loadedKeys = new Set();
+    let abortController = null;
     let lastRequestExtent = null;
 
-    const bldCfg = MAP_CONFIG.economic.building;
+
+    // 监听 props.visible 变化
+    watch(() => props.visible, (val) => {
+      if (layerInstance.value) layerInstance.value.visible = val;
+      if (wmsLayer.value && !useWFS.value) wmsLayer.value.visible = val;
+    });
 
     // --- 初始化 WMS 占位图层 ---
     const initWMSLayer = () => {
@@ -44,6 +49,7 @@ export default {
       const FeatureLayer = props.modules[2];
       const Graphic = props.modules[3];
       if (!FeatureLayer || !Graphic) return;
+      if (hasLoaded.value) return;
 
       // 构造 URL：复用配置逻辑并去掉 bbox 参数
       const finalUrl = bldCfg.getWfsUrl("").replace("&bbox=", "") + "&propertyName=the_geom,坐标";
@@ -109,6 +115,8 @@ export default {
         useWFS.value = true;
         if (wmsLayer.value) wmsLayer.value.visible = false;
         isLoading.value = false;
+        
+        hasLoaded.value = true;
 
       } catch (error) {
         isLoading.value = false;

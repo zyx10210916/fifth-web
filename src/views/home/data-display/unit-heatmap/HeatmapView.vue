@@ -1,34 +1,68 @@
 <template>
-  <div v-if="visible" class="heatmap-field-selector">
-    <div class="selector-content">
-      <span class="label">热力权重：</span>
-      <el-radio-group v-model="selectedField" size="small">
-        <el-radio-button label="">按点密度</el-radio-button>
-        <el-radio-button label="zczj_sum">资产总计</el-radio-button>
-        <el-radio-button label="qmrs_sum">期末人数</el-radio-button>
-        <el-radio-button label="yylr_sum">营业利润</el-radio-button>
-        <el-radio-button label="yysr_sum">营业收入</el-radio-button>
-      </el-radio-group>
+  <div v-if="visible" class="heatmap-container">
+    <div class="heatmap-panel">
+      <div class="heatmap-field-selector">
+        <span class="label">热力权重：</span>
+        <el-radio-group v-model="selectedField" size="small">
+          <el-radio-button label="total_coun">按企业密度</el-radio-button>
+          <el-radio-button label="zczj_sum_s">资产总计</el-radio-button>
+          <el-radio-button label="qmrs_sum_s">期末人数</el-radio-button>
+          <el-radio-button label="yylr_sum_s">营业利润</el-radio-button>
+          <el-radio-button label="yysr_sum_s">营业收入</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <div class="heatmap-legend">
+        <div class="legend-labels">
+          <span class="legend-val">{{ formatVal(legendInfo.min) }}</span>
+          <span class="legend-val">{{ formatVal(legendInfo.mid) }}</span>
+          <span class="legend-val">{{ formatVal(legendInfo.max) }}</span>
+        </div>
+        <div class="legend-bar"></div>
+        <div class="legend-title">数值范围 ({{ legendInfo.label }})</div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, watch, onUnmounted, shallowRef } from 'vue';
+import { ref, watch, onUnmounted, shallowRef, computed } from 'vue';
+
+// 定义字段数值范围配置 (根据用户提供数据)
+const FIELD_CONFIG = {
+  total_coun: { min: 1, max: 17656, label: '家' },
+  zczj_sum_s: { min: 0, max: 2103452872, label: '元' },
+  qmrs_sum_s: { min: 0, max: 91086, label: '人' },
+  yylr_sum_s: { min: -12856095, max: 31060063, label: '元' },
+  yysr_sum_s: { min: 0, max: 601751463, label: '元' }
+};
 
 export default {
   name: 'HeatmapLayerManager',
   props: {
     view: Object,      // ArcGIS View 实例
     modules: Array,    // ArcGIS 模块数组
-    points: Array,     // WFS 请求回来的当前视图点数据
-    visible: Boolean   // 目录树控制的显隐
+    visible: Boolean   // 显隐控制
   },
   setup(props) {
     const heatmapLayer = shallowRef(null);
-    const selectedField = ref("");
+    const selectedField = ref("total_coun"); 
+    const heatmapData = ref([]); 
 
-    //-- 移除图层--//
+    // 计算当前图例显示的数值
+    const legendInfo = computed(() => {
+      const config = FIELD_CONFIG[selectedField.value] || { min: 0, max: 100, label: '' };
+      return {
+        min: config.min,
+        max: config.max,
+        mid: (config.min + config.max) / 2,
+        label: config.label
+      };
+    });
+
+    // 格式化数值为整数且带千分位
+    const formatVal = (val) => Math.floor(val).toLocaleString();
+
     const removeLayer = () => {
       if (heatmapLayer.value && props.view) {
         props.view.map.remove(heatmapLayer.value);
@@ -36,18 +70,26 @@ export default {
       }
     };
 
-    //-- 根据字段获取热力图渲染器--//
-    const getRenderer = (field) => {
-      let maxIntensity = 100;
-      if (field === 'QMRS') {
-        maxIntensity = 100000;
-      } else if (field) {
-        maxIntensity = 500000;
+    const fetchHeatmapData = async () => {
+      if (heatmapData.value.length > 0 || !props.visible || !props.view) return;
+      try {
+        const typeName = "dataCenterWorkspace:yuwangshuju";
+        const url = `http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:4526`;
+        const response = await fetch(url);
+        const geojson = await response.json();
+        heatmapData.value = geojson.features || [];
+        refreshHeatmap();
+      } catch (e) {
+        console.error("热力图全量数据请求失败:", e);
       }
+    };
 
+    const getRenderer = (field) => {
+      const config = FIELD_CONFIG[field] || { min: 0, max: 100 };
+      
       return {
         type: "heatmap",
-        field: field || null,
+        field: field,
         colorStops: [
           { color: "rgba(0, 255, 255, 0)", ratio: 0 },
           { color: "rgba(0, 255, 255, 0.7)", ratio: 0.2 },
@@ -56,36 +98,36 @@ export default {
           { color: "rgb(255, 0, 0)", ratio: 0.9 }
         ],
         radius: 14,
-        maxPixelIntensity: maxIntensity,
-        minPixelIntensity: 0
+        // 使用配置中的 max/min 设定渲染阈值
+        maxPixelIntensity: config.max,
+        minPixelIntensity: config.min > 0 ? config.min : 0
       };
     };
 
-    //-- 执行创建或刷新--//
-    const refreshHeatmap = async () => {
-      if (!props.visible || !props.points || props.points.length === 0) {
+    const refreshHeatmap = () => {
+      if (!props.visible || heatmapData.value.length === 0) {
         removeLayer();
         return;
       }
 
       const [, , FeatureLayer, Graphic] = props.modules;
 
-      // 转换数据为 ArcGIS Graphics
-      const graphics = props.points.map((f, idx) => {
+      const graphics = heatmapData.value.map((f, idx) => {
         const p = f.properties || {};
         return new Graphic({
           geometry: {
             type: "point",
             x: f.geometry.coordinates[0],
             y: f.geometry.coordinates[1],
-            spatialReference: { wkid: 4526 } 
+            spatialReference: { wkid: 4526 }
           },
           attributes: {
             ObjectId: idx,
-            zczj_sum: parseFloat(p.zczj_sum || 0),
-            yylr_sum: parseFloat(p.YYLR || 0),
-            qmrs_sum: parseFloat(p.QMRS || 0),
-            yysr_sum: parseFloat(p.yysr_sum || 0)
+            total_coun: parseFloat(p.total_coun || 0),
+            zczj_sum_s: parseFloat(p.zczj_sum_s || 0),
+            qmrs_sum_s: parseFloat(p.qmrs_sum_s || 0),
+            yylr_sum_s: parseFloat(p.yylr_sum_s || 0),
+            yysr_sum_s: parseFloat(p.yysr_sum_s || 0)
           }
         });
       });
@@ -94,14 +136,15 @@ export default {
 
       heatmapLayer.value = new FeatureLayer({
         id: "dynamic_heatmap_layer",
-        source: graphics,
+        source: graphics, 
         objectIdField: "ObjectId",
         fields: [
           { name: "ObjectId", type: "oid" },
-          { name: "zczj_sum", type: "double" },
-          { name: "yylr_sum", type: "double" },
-          { name: "qmrs_sum", type: "double" },
-          { name: "yysr_sum", type: "double" }
+          { name: "total_coun", type: "double" },
+          { name: "zczj_sum_s", type: "double" },
+          { name: "qmrs_sum_s", type: "double" },
+          { name: "yylr_sum_s", type: "double" },
+          { name: "yysr_sum_s", type: "double" }
         ],
         renderer: getRenderer(selectedField.value)
       });
@@ -109,40 +152,94 @@ export default {
       props.view.map.add(heatmapLayer.value);
     };
 
-    watch(
-      [() => props.points, () => selectedField.value, () => props.visible],
-      () => {
-        refreshHeatmap();
-      },
-      { deep: true, immediate: true }
-    );
+    watch(() => props.visible, (newVal) => {
+      if (newVal) fetchHeatmapData();
+      else removeLayer();
+    }, { immediate: true });
+
+    watch([() => heatmapData.value, () => selectedField.value], refreshHeatmap);
 
     onUnmounted(removeLayer);
 
-    return { selectedField };
+    return { selectedField, legendInfo, formatVal };
   }
 };
 </script>
 
 <style scoped>
-.heatmap-field-selector {
+.heatmap-container {
   position: absolute;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 9999;
+  z-index: 1000;
+  pointer-events: none; /* 允许点击穿透到地图，但面板内部元素会重新开启 */
+}
+
+.heatmap-panel {
+  pointer-events: auto;
   background: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.heatmap-field-selector {
   display: flex;
   align-items: center;
 }
 
 .label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
+  color: #333;
+  margin-right: 12px;
+}
+
+/* 图例增强样式 */
+.heatmap-legend {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 10px;
+}
+
+.legend-labels {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.legend-val {
+  font-size: 11px;
   color: #666;
-  margin-right: 8px;
+  font-family: monospace;
+}
+
+.legend-bar {
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(to right, 
+    rgba(0, 255, 255, 0), 
+    rgba(0, 255, 255, 0.7), 
+    rgb(0, 255, 0), 
+    rgb(255, 255, 0), 
+    rgb(255, 0, 0)
+  );
+  border: 1px solid #eee;
+}
+
+.legend-title {
+  font-size: 10px;
+  color: #999;
+  margin-top: 4px;
+  text-transform: uppercase;
 }
 </style>
