@@ -72,7 +72,6 @@ const clearGroups = () => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
 .comparison-map-wrapper {
   position: relative;
   height: 100%;
