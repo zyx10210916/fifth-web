@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import MapView from '../MapView.vue';
 import { message } from 'ant-design-vue';
 
@@ -28,19 +28,10 @@ const props = defineProps({
 
 const emit = defineEmits(['map-select']);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
-const selectedGroups = ref<Array<{zxAxis: string, yxAxis: string}>>([]);
+const selectedGroups = ref<Array<{ zxAxis: string, yxAxis: string }>>([]);
 
 const handleMapLoaded = async () => {
-  if (mapView.value) {
-    await mapView.value.fetchBuildingPoints(props.filterParams);
-  }
 };
-
-watch(() => props.filterParams, (newParams) => {
-  if (mapView.value) {
-    mapView.value.fetchBuildingPoints(newParams);
-  }
-}, { deep: true });
 
 const handleMapSelect = (payload: any) => {
   if (!payload || (!payload.zxAxis && !payload.yxAxis)) return;
@@ -56,7 +47,7 @@ const handleMapSelect = (payload: any) => {
     zxAxis: payload.zxAxis,
     yxAxis: payload.yxAxis
   });
-  
+
   message.success(`已添加区域 ${selectedGroups.value.length}`);
 };
 
@@ -74,8 +65,8 @@ const clearGroups = () => {
   if (view && view.graphics) {
     view.graphics.removeAll();
   }
- if (mapView.value) {
-    mapView.value.clearMapTools(); 
+  if (mapView.value) {
+    mapView.value.clearMapTools();
   }
 };
 </script>

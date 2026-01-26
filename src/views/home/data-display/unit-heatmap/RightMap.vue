@@ -110,7 +110,6 @@ export default {
       mapInstance.value = payload.view;
       mapModules.value = payload.modules;
       mapIsReady.value = true;
-      mapView.value.fetchBuildingPoints(props.filterParams);
     };
 
     const handlePointsUpdate = (data) => {
@@ -120,12 +119,6 @@ export default {
      const handleMapSelect = (payload) => {
       emit('map-select', payload); 
     };
- 
-
-    // 监听筛选
-    watch(() => props.filterParams, (newParams) => {
-      if (mapView.value) mapView.value.fetchBuildingPoints(newParams);
-    }, { deep: true });
 
     watch(() => props.selectedUnit, (unit) => {
       if (unit) {

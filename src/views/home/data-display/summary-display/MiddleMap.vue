@@ -6,7 +6,7 @@
 </template>
  
 <script>
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import MapView from '../MapView.vue';
  
 export default {
@@ -21,20 +21,11 @@ export default {
     const mapView = ref(null);
     
     const handleMapLoaded = async () => {
-      if (mapView.value) {
-        await mapView.value.fetchBuildingPoints(props.filterParams);
-      }
     };
  
     const handleMapSelect = (payload) => {
       emit('map-select', payload); 
     };
- 
-    watch(() => props.filterParams, (newParams) => {
-      if (mapView.value) {
-        mapView.value.fetchBuildingPoints(newParams);
-      }
-    }, { deep: true });
  
     return {
       mapView,
