@@ -13,6 +13,7 @@ declare module 'vue' {
     ACard: typeof import('ant-design-vue/es')['Card']
     ACheckbox: typeof import('ant-design-vue/es')['Checkbox']
     ACheckboxGroup: typeof import('ant-design-vue/es')['CheckboxGroup']
+    ACol: typeof import('ant-design-vue/es')['Col']
     ACollapse: typeof import('ant-design-vue/es')['Collapse']
     ACollapsePanel: typeof import('ant-design-vue/es')['CollapsePanel']
     AddIndicatorModal: typeof import('./../src/components/DerivativeIndicators/AddIndicatorModal/index.vue')['default']
@@ -26,6 +27,7 @@ declare module 'vue' {
     AMenuItem: typeof import('ant-design-vue/es')['MenuItem']
     AModal: typeof import('ant-design-vue/es')['Modal']
     APagination: typeof import('ant-design-vue/es')['Pagination']
+    ARow: typeof import('ant-design-vue/es')['Row']
     ASelect: typeof import('ant-design-vue/es')['Select']
     ASelectOption: typeof import('ant-design-vue/es')['SelectOption']
     ASpace: typeof import('ant-design-vue/es')['Space']
@@ -94,6 +96,7 @@ declare module 'vue' {
     SvgIcon: typeof import('./../src/components/SvgIcon/index.vue')['default']
     TagQueryModal: typeof import('./../src/components/InfoTemplate/TagQueryModal.vue')['default']
     TemplateManage: typeof import('./../src/components/TemplateManage/index.vue')['default']
+    UserOutlined: typeof import('@ant-design/icons-vue')['UserOutlined']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

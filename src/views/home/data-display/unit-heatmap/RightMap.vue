@@ -2,8 +2,12 @@
   <MapView ref="mapView" :show-heatmap-option="true" @map-select="handleMapSelect" @map-loaded="handleMapLoaded"
     @building-loaded="handlePointsUpdate" @heatmap-visible="val => isHeatmapVisible = val">
     <template #map-overlay>
-      <HeatmapView v-if="mapIsReady" :view="mapInstance" :modules="mapModules" :points="currentWfsPoints"
-        :visible="isHeatmapVisible" />
+     <HeatmapView 
+        v-if="mapIsReady" 
+        :view="mapInstance" 
+        :modules="mapModules" 
+        :visible="isHeatmapVisible" 
+      />
     </template>
   </MapView>
 </template>
@@ -81,13 +85,13 @@ export default {
         view.graphics.add(highlightGraphic);
         highlightRef.value = highlightGraphic;
 
-        await view.goTo({
-          target: pointGeometry,
-          zoom: 17
-        }, {
-          duration: 1200,
-          easing: "ease-in-out"
-        });
+        // await view.goTo({
+        //   target: pointGeometry,
+        //   zoom: 17
+        // }, {
+        //   duration: 1200,
+        //   easing: "ease-in-out"
+        // });
 
         view.popup.open({
           title: unit.B102 || '单位信息',

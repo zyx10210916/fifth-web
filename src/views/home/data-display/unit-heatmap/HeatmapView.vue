@@ -26,9 +26,8 @@
 </template>
 
 <script>
-import { ref, watch, onUnmounted, shallowRef, computed } from 'vue';
+import { ref, watch, onUnmounted, onMounted, shallowRef, computed } from 'vue';
 
-// 定义字段数值范围配置 (根据用户提供数据)
 const FIELD_CONFIG = {
   total_coun: { min: 1, max: 17656, label: '家' },
   zczj_sum_s: { min: 0, max: 2103452872, label: '元' },
@@ -40,16 +39,15 @@ const FIELD_CONFIG = {
 export default {
   name: 'HeatmapLayerManager',
   props: {
-    view: Object,      // ArcGIS View 实例
-    modules: Array,    // ArcGIS 模块数组
-    visible: Boolean   // 显隐控制
+    view: Object,
+    modules: Object, // 建议统一为对象或数组
+    visible: Boolean
   },
   setup(props) {
     const heatmapLayer = shallowRef(null);
     const selectedField = ref("total_coun"); 
     const heatmapData = ref([]); 
 
-    // 计算当前图例显示的数值
     const legendInfo = computed(() => {
       const config = FIELD_CONFIG[selectedField.value] || { min: 0, max: 100, label: '' };
       return {
@@ -60,7 +58,6 @@ export default {
       };
     });
 
-    // 格式化数值为整数且带千分位
     const formatVal = (val) => Math.floor(val).toLocaleString();
 
     const removeLayer = () => {
@@ -70,15 +67,20 @@ export default {
       }
     };
 
+    // 修改点 1：去掉 visible 判断，仅判断是否已有数据
     const fetchHeatmapData = async () => {
-      if (heatmapData.value.length > 0 || !props.visible || !props.view) return;
+      if (heatmapData.value.length > 0) return;
       try {
-        const typeName = "dataCenterWorkspace:yuwangshuju";
-        const url = `http://192.168.10.123:8089/geoserver/dataCenterWorkspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:4526`;
+        const typeName = "workspace:yuwangshuju";
+        const url = `http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:4526`;
         const response = await fetch(url);
         const geojson = await response.json();
         heatmapData.value = geojson.features || [];
-        refreshHeatmap();
+        
+        // 如果数据回来时用户已经开启了开关，则直接渲染
+        if (props.visible) {
+          refreshHeatmap();
+        }
       } catch (e) {
         console.error("热力图全量数据请求失败:", e);
       }
@@ -86,7 +88,6 @@ export default {
 
     const getRenderer = (field) => {
       const config = FIELD_CONFIG[field] || { min: 0, max: 100 };
-      
       return {
         type: "heatmap",
         field: field,
@@ -98,14 +99,14 @@ export default {
           { color: "rgb(255, 0, 0)", ratio: 0.9 }
         ],
         radius: 14,
-        // 使用配置中的 max/min 设定渲染阈值
         maxPixelIntensity: config.max,
         minPixelIntensity: config.min > 0 ? config.min : 0
       };
     };
 
     const refreshHeatmap = () => {
-      if (!props.visible || heatmapData.value.length === 0) {
+      // 修改点 2：渲染时才检查 visible
+      if (!props.visible || heatmapData.value.length === 0 || !props.view) {
         removeLayer();
         return;
       }
@@ -152,12 +153,21 @@ export default {
       props.view.map.add(heatmapLayer.value);
     };
 
-    watch(() => props.visible, (newVal) => {
-      if (newVal) fetchHeatmapData();
-      else removeLayer();
-    }, { immediate: true });
+    // 修改点 3：挂载即请求数据
+    onMounted(() => {
+      fetchHeatmapData();
+    });
 
-    watch([() => heatmapData.value, () => selectedField.value], refreshHeatmap);
+    // 监听显隐，只负责渲染控制
+    watch(() => props.visible, (newVal) => {
+      if (newVal) {
+        refreshHeatmap();
+      } else {
+        removeLayer();
+      }
+    });
+
+    watch(() => selectedField.value, refreshHeatmap);
 
     onUnmounted(removeLayer);
 
@@ -173,7 +183,7 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  pointer-events: none; /* 允许点击穿透到地图，但面板内部元素会重新开启 */
+  pointer-events: none; 
 }
 
 .heatmap-panel {

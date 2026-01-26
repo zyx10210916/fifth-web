@@ -54,7 +54,7 @@ export const MAP_CONFIG = {
       }
     },
     // 房屋面 URL
-    houseUrl: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&maxFeatures=500&outputFormat=application%2Fjson"
+    houseUrl: "http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=workspace%3AWJPFWMpc38&outputFormat=application%2Fjson"
   },
 
   // 底图服务 URL

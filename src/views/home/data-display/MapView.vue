@@ -400,7 +400,7 @@ const handleMapClick = async (event) => {
       panelVisible, boundaryLayers, houseLayer, mapList: MAP_CONFIG.basemapUI, mapToolsRef,
       activeBasemapId, basemapVisible, togglePanel: () => panelVisible.value = !panelVisible.value,
       updateLayerVisibility, clearMapTools,
-      handleBasemapChange: (id) => { /* 底图切换逻辑 */ },
+      handleBasemapChange,
       handleMapSelect: (payload) => emit('map-select', payload),
       fetchBuildingPoints: (p) => buildingLayerRef.value?.fetchBuildingPoints(p),
       loadBuildingPoints: (d) => buildingLayerRef.value?.loadBuildingPoints(d),
@@ -517,7 +517,7 @@ const handleMapClick = async (event) => {
   position: absolute;
   top: 75%;
   right: 20px;
-  z-index: 99999;
+  z-index: 100;
   display: flex;
   gap: 10px;
   list-style: none;
