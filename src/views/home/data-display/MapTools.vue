@@ -20,209 +20,158 @@
 
 <script>
 import { ref, shallowRef, onUnmounted } from 'vue';
-import { loadModules } from 'esri-loader';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { query } from '@/utils/mapQuery';
 
 export default {
   name: 'MapTools',
   props: {
     view: { type: Object, required: true },
+    modules: { type: Object, required: true },
     appendMode: { type: Boolean, default: false }
   },
   setup(props, { emit, expose }) {
     const activeTool = ref(null);
     const draw = shallowRef(null);
     const measureLayer = shallowRef(null);
-    const modules = shallowRef({});
     const currentSketchVM = shallowRef(null);
-    const SketchVMClass = shallowRef(null);
 
-    const initModules = async () => {
-      const [
-        Draw,
-        GraphicsLayer,
-        Graphic,
-        geometryEngine,
-        SketchViewModel,
-        Point
-      ] = await loadModules([
-        'esri/views/draw/Draw',
-        'esri/layers/GraphicsLayer',
-        'esri/Graphic',
-        'esri/geometry/geometryEngine',
-        'esri/widgets/Sketch/SketchViewModel',
-        'esri/geometry/Point'
-      ]);
-
-      modules.value = { Draw, GraphicsLayer, Graphic, geometryEngine, Point };
-      SketchVMClass.value = SketchViewModel;
-
-      draw.value = new Draw({ view: props.view });
-
-      // 初始化图层
+    // 初始化内部图层
+    const initToolResources = () => {
+      const { Draw, GraphicsLayer } = props.modules;
+      if (!draw.value) draw.value = new Draw({ view: props.view });
       if (!measureLayer.value) {
-        measureLayer.value = new GraphicsLayer({
-          id: "custom_tools_layer",
-          spatialReference: props.view.spatialReference
-        });
+        measureLayer.value = new GraphicsLayer({ id: "custom_tools_layer" });
         props.view.map.add(measureLayer.value);
       }
     };
 
     // 停止当前活动工具
     const destroyActiveTools = () => {
-      if (draw.value) {
-        draw.value.reset();
-      }
-      if (currentSketchVM.value) {
-        currentSketchVM.value.destroy();
-        currentSketchVM.value = null;
-      }
+      draw.value?.reset();
+      currentSketchVM.value?.destroy();
+      currentSketchVM.value = null;
     };
 
     const clearAll = (shouldNotify = true) => {
       measureLayer.value?.removeAll();
       destroyActiveTools();
       activeTool.value = null;
-      if (shouldNotify) {
-        emit('map-select', '');
-      }
+      if (shouldNotify) emit('map-select', { zxAxis: "", yxAxis: "" });
     };
 
     // --- 测量功能 ---
-    const startMeasure = async (type) => {
-      await initModules();
-      clearAll(false);
-      activeTool.value = type;
+  const startMeasure = async (type) => {
+  initToolResources();
+  clearAll(false);
+  activeTool.value = type;
 
-      const isLine = type === 'distance';
-      const action = draw.value.create(isLine ? "polyline" : "polygon");
+  const isLine = type === 'distance';
+  const action = draw.value.create(isLine ? "polyline" : "polygon");
 
-      const handleUpdate = (evt) => {
-        measureLayer.value.removeAll();
-        const { Graphic, geometryEngine } = modules.value;
+  // 定义处理函数
+  const handleUpdate = (evt) => {
+    measureLayer.value.removeAll();
+    // 确保从语义化对象中解构模块
+    const { Graphic, geometryEngine } = props.modules;
 
-        const geometry = {
-          type: isLine ? "polyline" : "polygon",
-          [isLine ? "paths" : "rings"]: [evt.vertices],
-          spatialReference: props.view.spatialReference
-        };
+    const geometry = {
+      type: isLine ? "polyline" : "polygon",
+      [isLine ? "paths" : "rings"]: [evt.vertices],
+      spatialReference: props.view.spatialReference
+    };
 
-        const graphic = new Graphic({
-          geometry,
-          symbol: {
-            type: isLine ? "simple-line" : "simple-fill",
-            color: [255, 68, 0, isLine ? 0.8 : 0.3],
-            width: isLine ? "4px" : null,
-            outline: {
-              color: [255, 68, 0],
-              width: isLine ? 0 : 4,
-              style: "solid"
-            }
-          }
-        });
-        measureLayer.value.add(graphic);
+    // 绘制测量的线或面
+    measureLayer.value.add(new Graphic({
+      geometry,
+      symbol: {
+        type: isLine ? "simple-line" : "simple-fill",
+        color: [255, 68, 0, isLine ? 0.8 : 0.3],
+        width: isLine ? "4px" : null,
+        outline: { color: [255, 68, 0], width: isLine ? 0 : 4, style: "solid" }
+      }
+    }));
 
-        if (isLine && evt.vertices.length >= 2) {
-          const startPoint = new Graphic({
-            geometry: {
-              type: "point",
-              x: evt.vertices[0][0],
-              y: evt.vertices[0][1],
-              spatialReference: props.view.spatialReference
-            },
-            symbol: {
-              type: "simple-marker",
-              color: [255, 68, 0],
-              size: "12px",
-              outline: {
-                color: [255, 255, 255],
-                width: 1
-              }
-            }
-          });
-
-          const endPoint = new Graphic({
-            geometry: {
-              type: "point",
-              x: evt.vertices.at(-1)[0],
-              y: evt.vertices.at(-1)[1],
-              spatialReference: props.view.spatialReference
-            },
-            symbol: {
-              type: "simple-marker",
-              color: [255, 68, 0],
-              size: "12px",
-              outline: {
-                color: [255, 255, 255],
-                width: 1
-              }
-            }
-          });
-
-          measureLayer.value.addMany([startPoint, endPoint]);
-        }
-
-        let text = "";
-        try {
-          if (isLine) {
-            const length = geometryEngine.planarLength(geometry, "meters");
-            text = length > 1000 ? (length / 1000).toFixed(2) + " km" : Math.round(length) + " m";
-          } else {
-            const area = geometryEngine.planarArea(geometry, "square-meters");
-            text = area > 1000000 ? (area / 1000000).toFixed(2) + " km²" : Math.round(area) + " m²";
-          }
-        } catch (e) { console.error("计算失败", e); }
-
-        const label = new Graphic({
-          geometry: { type: "point", x: evt.vertices.at(-1)[0], y: evt.vertices.at(-1)[1], spatialReference: props.view.spatialReference },
-          symbol: {
-            type: "text",
-            color: "white",
-            haloColor: "#ff4400",
-            haloSize: "2px",
-            text: text,
-            font: {
-              size: 14,
-              weight: "bold",
-              family: "Arial"
-            },
-            verticalAlignment: "bottom"
-          }
-        });
-        measureLayer.value.add(label);
-
-        if (evt.type === "draw-complete") activeTool.value = null;
+    // 如果是测距，添加起止点标记
+    if (isLine && evt.vertices.length >= 2) {
+      const pointSymbol = {
+        type: "simple-marker",
+        color: [255, 68, 0],
+        size: "12px",
+        outline: { color: [255, 255, 255], width: 1 }
       };
 
-      action.on(["cursor-update", "vertex-add", "draw-complete"], handleUpdate);
-    };
+      const startPoint = new Graphic({
+        geometry: { type: "point", x: evt.vertices[0][0], y: evt.vertices[0][1], spatialReference: props.view.spatialReference },
+        symbol: pointSymbol
+      });
+
+      const endPoint = new Graphic({
+        geometry: { type: "point", x: evt.vertices.at(-1)[0], y: evt.vertices.at(-1)[1], spatialReference: props.view.spatialReference },
+        symbol: pointSymbol
+      });
+
+      measureLayer.value.addMany([startPoint, endPoint]);
+    }
+
+    // 计算长度或面积
+    let text = "";
+    try {
+      if (isLine) {
+        const length = geometryEngine.planarLength(geometry, "meters");
+        text = length > 1000 ? (length / 1000).toFixed(2) + " km" : Math.round(length) + " m";
+      } else {
+        const area = geometryEngine.planarArea(geometry, "square-meters");
+        text = area > 1000000 ? (area / 1000000).toFixed(2) + " km²" : Math.round(area) + " m²";
+      }
+    } catch (e) {
+      console.error("空间计算失败", e);
+    }
+
+    // 添加测量数值标签
+    const label = new Graphic({
+      geometry: { 
+        type: "point", 
+        x: evt.vertices.at(-1)[0], 
+        y: evt.vertices.at(-1)[1], 
+        spatialReference: props.view.spatialReference 
+      },
+      symbol: {
+        type: "text",
+        color: "white",
+        haloColor: "#ff4400",
+        haloSize: "2px",
+        text: text,
+        font: { size: 14, weight: "bold", family: "Arial" },
+        verticalAlignment: "bottom"
+      }
+    });
+    measureLayer.value.add(label);
+
+    // 完成后重置状态
+    if (evt.type === "draw-complete") activeTool.value = null;
+  };
+
+  // 统一监听事件
+  action.on(["cursor-update", "vertex-add", "draw-complete"], handleUpdate);
+};
 
     // --- 拉框选择功能 ---
     //拉框逻辑
-    const startRectSelect = async () => {
-      await initModules();
+    const startRectSelect = () => {
+      initToolResources();
       destroyActiveTools();
-
-      if (currentSketchVM.value) {
-        currentSketchVM.value.destroy();
-      }
-
-      if (!props.appendMode) {
-        clearAll();
-      }
+      if (!props.appendMode) clearAll();
       activeTool.value = 'rect';
 
-      const sketchVM = new SketchVMClass.value({
+      const { SketchViewModel } = props.modules;
+      const sketchVM = new SketchViewModel({
         view: props.view,
         layer: measureLayer.value,
         updateOnGraphicClick: false,
-        polygonSymbol: MAP_CONFIG.styles.selectionRect,
-        defaultCreateOptions: {
-          mode: "click",
-          toggleToolOnClick: true
-        }
+        polygonSymbol: MAP_CONFIG.styles.selectionRect
       });
+
       currentSketchVM.value = sketchVM;
       sketchVM.create("polygon");
       sketchVM.on("create", (event) => {
@@ -231,105 +180,26 @@ export default {
           activeTool.value = null;
         }
       });
-
-      props.view.on("double-click", () => {
-        sketchVM.complete();
-      });
     };
 
     // 高亮选中及发送查询逻辑
     const querySelectedPoints = async (geometry) => {
-      const bldCfg = MAP_CONFIG.economic.building;
-      const buildingLayer = props.view.map.findLayerById(bldCfg.id);
-      const highlightStyle = MAP_CONFIG.styles.highlightPoint;
+      const { Graphic } = props.modules;
+      const result = await query(geometry, props.modules);
 
-      if (!buildingLayer) return;
-
-      try {
-        if (!modules.value.Point) await initModules();
-        const { Graphic, geometryEngine, Point } = modules.value;
-        const viewSR = props.view.spatialReference;
-
-        // 1. 获取 BBOX 范围内的全量原始数据
-        const ext = geometry.extent;
-        const bbox = `${ext.xmin},${ext.ymin},${ext.xmax},${ext.ymax}`;
-        const response = await fetch(bldCfg.getWfsUrl(bbox));
-        const geojson = await response.json();
-        const candidates = geojson.features || [];
-
-        // 2. 空间过滤与字段解析
-        const renderMap = new Map();
-        const xAxisList = []; // 存储 zxAxis 字符串数组
-        const yAxisList = []; // 存储 yxAxis 字符串数组
-        let recordCount = 0;
-
-        candidates.forEach(f => {
-          //  通过geometry判断是否在拉框范围内
-          const x = Number(f.geometry.coordinates[0]);
-          const y = Number(f.geometry.coordinates[1]);
-          const pt = new Point({ x, y, spatialReference: viewSR });
-
-          if (geometryEngine.contains(geometry, pt)) {
-            recordCount++;
-
-            // --- 解析“坐标”属性字段 ---
-            const coordStr = f.properties["坐标"] || "";
-            if (coordStr && coordStr.includes(',')) {
-              const [zx, yx] = coordStr.split(',');
-              xAxisList.push(zx.trim());
-              yAxisList.push(yx.trim());
-            } else {
-              // 如果该字段异常，使用经纬度保证业务不中断
-              xAxisList.push(x.toFixed(6));
-              yAxisList.push(y.toFixed(6));
-            }
-
-            // 渲染去重逻辑：同一个位置只画一个点
-            const geoKey = `${x.toFixed(6)},${y.toFixed(6)}`;
-            if (!renderMap.has(geoKey)) {
-              renderMap.set(geoKey, pt);
-            }
-          }
-        });
-
-        // 3. 视觉渲染 
-        if (!props.appendMode) {
-          measureLayer.value.removeAll();
-          measureLayer.value.add(new Graphic({
-            geometry: geometry,
-            symbol: MAP_CONFIG.styles.selectionRect
-          }));
-        }
-
-        renderMap.forEach((pt) => {
-          measureLayer.value.add(new Graphic({
-            geometry: pt,
-            symbol: highlightStyle
-          }));
-        });
-
-        // 4. 业务数据下发：拼接为逗号分隔的字符串
-        emit('map-select', {
-          zxAxis: xAxisList.join(','),
-          yxAxis: yAxisList.join(',')
-        });
-
-        console.log(`[坐标解析模式] 选中记录数: ${recordCount}, 解析坐标对: ${xAxisList.length}, 渲染物理点: ${renderMap.size}`);
-
-      } catch (err) {
-        console.error("MapTools 属性坐标查询失败:", err);
+      if (!props.appendMode) {
+        measureLayer.value.removeAll();
+        measureLayer.value.add(new Graphic({
+          geometry, symbol: MAP_CONFIG.styles.selectionRect
+        }));
       }
+      measureLayer.value.addMany(result.graphics);
+      emit('map-select', { zxAxis: result.zxAxis, yxAxis: result.yxAxis });
     };
-    onUnmounted(() => {
-      if (measureLayer.value) props.view.map.remove(measureLayer.value);
-    });
 
-    expose({
-      clearAll,
-      startRectSelect,
-      startMeasure
-    });
+    onUnmounted(() => { if (measureLayer.value) props.view.map.remove(measureLayer.value); });
 
+    expose({ clearAll, startRectSelect, startMeasure });
     return { activeTool, startMeasure, startRectSelect, clearAll };
   }
 };

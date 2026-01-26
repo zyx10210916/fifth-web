@@ -24,11 +24,13 @@
   </a-tabs>
 
   <div class="dynamic-comp">
+    <keep-alive>
     <component 
       :is="activeComponent" 
       :filter-params="filterParams" 
       @update-params="handleFilterApply" 
     />
+    </keep-alive>
   </div>
 
   <FilterModal 
@@ -54,7 +56,6 @@ const componentMap = {
   summary: SummaryDisplay,
   heatmap: UnitHeatmap,
   comparison: DataComparison,
-  // building: BuildingDisplay,
 };
 
 const activeComponent = computed(() => componentMap[activeTabKey.value]);

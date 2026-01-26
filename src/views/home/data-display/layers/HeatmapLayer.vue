@@ -27,6 +27,7 @@
 
 <script>
 import { ref, watch, onUnmounted, onMounted, shallowRef, computed } from 'vue';
+import { MAP_CONFIG } from '@/config/mapConfig';
 
 const FIELD_CONFIG = {
   total_coun: { min: 1, max: 17656, label: '家' },
@@ -35,18 +36,21 @@ const FIELD_CONFIG = {
   yylr_sum_s: { min: -12856095, max: 31060063, label: '元' },
   yysr_sum_s: { min: 0, max: 601751463, label: '元' }
 };
+let cachedHeatmapData = null;
 
 export default {
   name: 'HeatmapLayerManager',
   props: {
     view: Object,
-    modules: Object, // 建议统一为对象或数组
+    modules: Object, 
     visible: Boolean
   },
-  setup(props) {
+  emits: ['loading-status'],
+  setup(props, { emit }) {
     const heatmapLayer = shallowRef(null);
     const selectedField = ref("total_coun"); 
     const heatmapData = ref([]); 
+    const isFetching = ref(false);
 
     const legendInfo = computed(() => {
       const config = FIELD_CONFIG[selectedField.value] || { min: 0, max: 100, label: '' };
@@ -67,22 +71,34 @@ export default {
       }
     };
 
-    // 修改点 1：去掉 visible 判断，仅判断是否已有数据
     const fetchHeatmapData = async () => {
-      if (heatmapData.value.length > 0) return;
+      if (heatmapData.value.length > 0 || isFetching.value) return;
+      // 如果已经有缓存，直接使用
+      if (cachedHeatmapData) {
+        heatmapData.value = cachedHeatmapData;
+        if (props.visible) refreshHeatmap();
+        return;
+      }
       try {
-        const typeName = "workspace:yuwangshuju";
-        const url = `http://10.44.58.28:8089/geoserver/workspace/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json&srsName=EPSG:4526`;
+        isFetching.value = true;
+        emit('loading-status', true);
+
+        const url = MAP_CONFIG.economic.heatmap.url; 
         const response = await fetch(url);
         const geojson = await response.json();
-        heatmapData.value = geojson.features || [];
+        cachedHeatmapData = geojson.features || []; // 存入持久变量
+        heatmapData.value = cachedHeatmapData;
         
         // 如果数据回来时用户已经开启了开关，则直接渲染
         if (props.visible) {
           refreshHeatmap();
         }
       } catch (e) {
-        console.error("热力图全量数据请求失败:", e);
+        console.error("热力图数据请求失败:", e);
+      } finally {
+        isFetching.value = false;
+        // 请求结束（无论成功失败）关闭加载提示
+        emit('loading-status', false); 
       }
     };
 
@@ -105,13 +121,12 @@ export default {
     };
 
     const refreshHeatmap = () => {
-      // 修改点 2：渲染时才检查 visible
       if (!props.visible || heatmapData.value.length === 0 || !props.view) {
         removeLayer();
         return;
       }
 
-      const [, , FeatureLayer, Graphic] = props.modules;
+      const { FeatureLayer, Graphic } = props.modules;
 
       const graphics = heatmapData.value.map((f, idx) => {
         const p = f.properties || {};
@@ -153,7 +168,6 @@ export default {
       props.view.map.add(heatmapLayer.value);
     };
 
-    // 修改点 3：挂载即请求数据
     onMounted(() => {
       fetchHeatmapData();
     });

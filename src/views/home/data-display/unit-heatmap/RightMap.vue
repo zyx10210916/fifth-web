@@ -1,25 +1,21 @@
 <template>
-  <MapView ref="mapView" :show-heatmap-option="true" @map-select="handleMapSelect" @map-loaded="handleMapLoaded"
-    @building-loaded="handlePointsUpdate" @heatmap-visible="val => isHeatmapVisible = val">
-    <template #map-overlay>
-     <HeatmapView 
-        v-if="mapIsReady" 
-        :view="mapInstance" 
-        :modules="mapModules" 
-        :visible="isHeatmapVisible" 
-      />
-    </template>
-  </MapView>
+  <MapView 
+    ref="mapView" 
+    :show-heatmap-option="true" 
+    @map-select="handleMapSelect" 
+    @map-loaded="handleMapLoaded"
+    @building-loaded="handlePointsUpdate"
+    >
+    </MapView>
 </template>
 
 <script>
 import { ref, shallowRef } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapView from '../MapView.vue';
-import HeatmapView from './HeatmapView.vue';
 
 export default {
-  components: { MapView, HeatmapView },
+  components: { MapView },
   props: {
     selectedUnit: Object,
     filterParams: { type: Object, default: () => ({}) },
@@ -33,7 +29,6 @@ export default {
     const mapInstance = shallowRef(null);
     const mapModules = ref(null);
     const mapIsReady = ref(false);
-    const isHeatmapVisible = ref(false);
     const currentWfsPoints = ref([]);
 
 
@@ -144,7 +139,6 @@ export default {
       mapModules,
       mapIsReady,
       currentWfsPoints,
-      isHeatmapVisible,
       handleMapLoaded,
       handlePointsUpdate,
       handleMapSelect,

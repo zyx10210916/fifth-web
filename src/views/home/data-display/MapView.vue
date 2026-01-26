@@ -10,8 +10,16 @@
 
       <slot name="map-overlay"></slot>
 
-      <BuildingLayer v-if="mapIsReady" ref="buildingLayerRef" :view="view" :modules="mapModules"
-        :visible="buildingLayerState.visible" @loaded="(data) => $emit('building-loaded', data)" />
+      <template v-if="mapIsReady">
+        <BuildingLayer ref="buildingLayerRef" :view="view" :modules="mapModules" :visible="layersState.building.visible"
+          @loaded="(data) => $emit('building-loaded', data)" @loading-status="s => updateLayerLoading('building', s)" />
+
+        <HouseLayer :view="view" :modules="mapModules" :visible="layersState.house.visible"
+          @loading-status="s => updateLayerLoading('house', s)" />
+
+        <HeatmapLayer v-if="showHeatmapOption" :view="view" :modules="mapModules" :visible="layersState.heatmap.visible"
+          @loading-status="s => updateLayerLoading('heatmap', s)" />
+      </template>
 
       <ul class="mapType">
         <li v-for="item in mapList" :key="item.id" @click="handleBasemapChange(item.id)"
@@ -21,7 +29,10 @@
         </li>
       </ul>
 
-      <MapTools ref="mapToolsRef" :view="view" :appendMode="appendMode" @map-select="handleMapSelect" />
+      <MapTools 
+        ref="mapToolsRef" :view="view" :modules="mapModules"  :appendMode="appendMode" 
+        @map-select="handleMapSelect" 
+      />
 
       <div class="layer-tree-panel">
         <div class="panel-header">
@@ -31,27 +42,40 @@
 
         <div v-if="panelVisible" class="tree-content">
           <div class="tree-node tree-group"><label>经济普查数据</label></div>
+
           <div class="tree-node">
-            <input type="checkbox" id="building" v-model="buildingLayerState.visible" class="tree-checkbox">
-            <label for="building" class="tree-label">企业建筑点</label>
-          </div>
-          <div v-if="showHeatmapOption" class="tree-node">
-            <input type="checkbox" id="heatmap" v-model="heatmapVisible"
-              @change="$emit('heatmap-visible', heatmapVisible)" class="tree-checkbox">
-            <label for="heatmap" class="tree-label">企业热力图</label>
-          </div>
-          <div class="tree-node">
-            <input type="checkbox" id="house" v-model="houseLayer.visible" @change="updateLayerVisibility(houseLayer)"
+            <input type="checkbox" id="building" v-model="layersState.building.visible" @change="handleBuildingToggle"
               class="tree-checkbox">
-            <label for="house" class="tree-label">企业房屋面<span v-if="houseLayer.isFetching">(加载中...)</span></label>
+            <label for="building" class="tree-label">
+              企业建筑点
+              <span v-if="layersState.building.isFetching" style="color: #999; margin-left: 4px;">(加载中...)</span>
+            </label>
+          </div>
+
+          <div v-if="showHeatmapOption" class="tree-node">
+            <input type="checkbox" id="heatmap" v-model="layersState.heatmap.visible" class="tree-checkbox">
+            <label for="heatmap" class="tree-label">
+              企业热力图
+              <span v-if="layersState.heatmap.isFetching" style="color: #999; margin-left: 4px;">(加载中...)</span>
+            </label>
+          </div>
+
+          <div class="tree-node">
+            <input type="checkbox" id="house" v-model="layersState.house.visible" class="tree-checkbox">
+            <label for="house" class="tree-label">
+              企业房屋面
+              <span v-if="layersState.house.isFetching" style="color: #999; margin-left: 4px;">(加载中...)</span>
+            </label>
           </div>
 
           <div class="tree-node tree-group"><label>基础地理数据</label></div>
+
           <div class="tree-node">
             <input type="checkbox" id="basemap-toggle" v-model="basemapVisible" @change="updateBasemapVisibility"
               class="tree-checkbox">
             <label for="basemap-toggle" class="tree-label">底图</label>
           </div>
+
           <div v-for="layer in boundaryLayers" :key="layer.id" class="tree-node">
             <input type="checkbox" :id="layer.id" v-model="layer.visible" @change="updateLayerVisibility(layer)"
               class="tree-checkbox">
@@ -64,15 +88,18 @@
 </template>
 
 <script>
-import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw, nextTick } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted, computed, markRaw, nextTick, provide } from 'vue';
 import { loadModules } from 'esri-loader';
 import MapTools from './MapTools.vue';
-import BuildingLayer from './BuildingLayer.vue';
+import BuildingLayer from './layers/BuildingLayer.vue';
+import HeatmapLayer from './layers/HeatmapLayer.vue';
+import HouseLayer from './layers/HouseLayer.vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { query } from '@/utils/mapQuery';
 
 export default {
   name: 'MapView',
-  components: { MapTools, BuildingLayer },
+  components: { MapTools, BuildingLayer, HeatmapLayer, HouseLayer },
   props: {
     isFullSize: { type: Boolean, default: false },
     loading: { type: Boolean, default: false },
@@ -91,7 +118,6 @@ export default {
     const mapModules = shallowRef(null);
     const mapIsReady = ref(false);
     const buildingLayerRef = ref(null);
-    const heatmapVisible = ref(false);
     const panelVisible = ref(true);
     const basemapVisible = ref(true);
     const mapList = MAP_CONFIG.basemapUI;
@@ -99,50 +125,61 @@ export default {
     const mapToolsRef = ref(null);
     const highlightRef = shallowRef(null);
     const layers = ref([]);
-    const boundaryLayers = computed(() => layers.value.filter(l => l.type === 'boundary'));
-    const buildingLayerState = ref({ visible: true });
-    const selectedPointsGraphics = ref([]);
 
-    // 转发清除方法
-    const clearMapTools = () => {
-      mapToolsRef.value?.clearAll();
+    // 基础边界图层计算属性
+    const boundaryLayers = computed(() => layers.value.filter(l => l.type === 'boundary'));
+
+    // --- 核心重构：统一图层状态管理 ---
+    const layersState = ref({
+      building: { visible: false, isFetching: false, loaded: false },
+      house: { visible: false, isFetching: false },
+      heatmap: { visible: false, isFetching: false }
+    });
+
+    // 统一处理各子图层的加载状态回调
+    const updateLayerLoading = (layerKey, status) => {
+      layersState.value[layerKey].isFetching = status;
+      if (layerKey === 'building' && !status) {
+        layersState.value.building.loaded = true;
+      }
     };
 
-    const houseLayer = ref({
-      id: "house",
-      title: "企业房屋面",
-      visible: false,
-      type: "economic",
-      isFetching: false,
-      loaded: false,
-      instance: null
-    });
+    const handleBuildingToggle = () => {
+      if (layersState.value.building.visible && !layersState.value.building.loaded) {
+        buildingLayerRef.value?.triggerFullLoad();
+      }
+    };
 
     const initializeMap = async () => {
       try {
-        const modules = await loadModules([
-          'esri/Map', 'esri/views/MapView', 'esri/layers/FeatureLayer',
-          'esri/Graphic', 'esri/geometry/SpatialReference', 'esri/Basemap',
-          'esri/layers/TileLayer', 'esri/layers/GeoJSONLayer',
-          'esri/symbols/SimpleFillSymbol', 'esri/tasks/support/Query',
-          'esri/layers/WMSLayer',
-          'esri/geometry/geometryEngine',
-          'esri/geometry/Point'
-        ], { url: MAP_CONFIG.arcgis.js, css: MAP_CONFIG.arcgis.css });
+    // 1. 从配置中提取路径和名称
+    const moduleEntries = Object.entries(MAP_CONFIG.modules);
+    const paths = moduleEntries.map(([path]) => path);
+    const names = moduleEntries.map(([, name]) => name);
 
-        mapModules.value = modules;
-        const [
-          Map, MapView, FeatureLayer, Graphic, SpatialReference,
-          Basemap, TileLayer, GeoJSONLayer, SimpleFillSymbol,
-          Query, WMSLayer
-        ] = modules;
+    // 2. 加载模块数组
+    const loadedArr = await loadModules(paths, { 
+      url: MAP_CONFIG.arcgis.js, 
+      css: MAP_CONFIG.arcgis.css 
+    });
 
-        provide('arcgisModules', mapModules.value);
-        provide('mapView', view.value);
+    // 3. 构建语义化对象 (关键：不再使用索引)
+    const modulesObj = {};
+    names.forEach((name, index) => {
+      modulesObj[name] = loadedArr[index];
+    });
+    
+    // 4. 存储并提供给子组件
+    mapModules.value = markRaw(modulesObj);
+    provide('arcgisModules', mapModules.value);
+
+    // 5. 使用解构方式获取模块，代码更稳固
+    const { Map, MapView, Basemap } = modulesObj;
 
         const map = new Map({
           basemap: new Basemap({
-            baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
+            // baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
+            baseLayers: null,
             id: "street"
           })
         });
@@ -155,14 +192,12 @@ export default {
         });
 
         view.value.when(async () => {
-          console.log("地图初始化完成");
+          console.log("地图视图初始化完成");
           mapIsReady.value = true;
           await nextTick();
-          // 加载边界
-          await loadBoundaryLayers(map);
 
-          // 加载房屋面
-          await loadHouseLayer();
+          // 加载行政边界（如需要）
+          // await loadBoundaryLayers(map);
 
           view.value.on("click", handleMapClick);
           emit('map-loaded', { view: view.value, map, modules: mapModules.value });
@@ -172,203 +207,54 @@ export default {
       }
     };
 
-    const loadBoundaryLayers = async (map) => {
-      const FeatureLayer = mapModules.value[2];
-      for (const [key, config] of Object.entries(props.boundaryLayersConfig)) {
-        const layer = new FeatureLayer({
-          url: `${props.boundaryBaseUrl}/${config.layerId}`,
-          id: key,
-          title: config.title,
-          renderer: {
-            type: "simple",
-            symbol: { type: "simple-fill", color: [0, 0, 0, 0], outline: { color: config.outlineColor, width: 1.5 } }
-          },
-          visible: config.defaultVisible || false
-        });
-        map.add(layer);
-        layers.value.push({ id: key, title: config.title, visible: config.defaultVisible || false, instance: markRaw(layer), type: "boundary" });
-      }
-    };
+    const handleMapClick = async (event) => {
+      if (!view.value || !mapModules.value) return;
+      const { Graphic,geometryEngine, Point } = mapModules.value;
 
-    const loadHouseLayer = async () => {
-      if (houseLayer.value.loaded || houseLayer.value.isFetching) return;
-      houseLayer.value.isFetching = true;
-      const [, , FeatureLayer, Graphic] = mapModules.value;
+      const hitTest = await view.value.hitTest(event);
+      const priorityIds = ["house", "town", "district"];
+      let bestFit = null;
 
-      try {
-        const response = await fetch(props.houseLayerUrl);
-        const data = await response.json();
+      // 判定逻辑适配重构后的 layersState
+      for (const id of priorityIds) {
+        const isVisible = id === 'house' 
+          ? layersState.value.house.visible 
+          : layers.value.find(l => l.id === id)?.visible;
 
-        if (!data.features || data.features.length === 0) {
-          houseLayer.value.loaded = true;
-          return;
-        }
-
-        // 将 GeoJSON 转换为Graphics
-        const graphics = data.features.map((feature, index) => {
-          let rings = [];
-          if (feature.geometry.type === "MultiPolygon") {
-            rings = feature.geometry.coordinates.reduce((acc, polygon) => {
-              return acc.concat(polygon);
-            }, []);
-          } else if (feature.geometry.type === "Polygon") {
-            rings = feature.geometry.coordinates;
-          }
-
-          return new Graphic({
-            geometry: {
-              type: "polygon",
-              rings: rings,
-              spatialReference: { wkid: 4526 }
-            },
-            attributes: {
-              ...feature.properties,
-              OBJECTID: index + 1
-            }
-          });
-        });
-
-        // 创建 FeatureLayer
-        const layer = new FeatureLayer({
-          id: "house",
-          title: "企业房屋面",
-          source: graphics,
-          objectIdField: "OBJECTID",
-          fields: [
-            { name: "OBJECTID", type: "oid" },
-          ],
-          renderer: {
-            type: "simple",
-            symbol: {
-              type: "simple-fill",
-              color: [0, 121, 193, 0.2],
-              outline: { color: [0, 121, 193, 0.8], width: 1.5 }
-            }
-          },
-          visible: houseLayer.value.visible,
-          outFields: ["*"]
-        });
-
-        view.value.map.add(layer);
-        houseLayer.value.instance = markRaw(layer);
-        houseLayer.value.loaded = true;
-
-      } catch (error) {
-        console.error("处理房屋面数据时出错:", error);
-      } finally {
-        houseLayer.value.isFetching = false;
-      }
-    };
-
-const handleMapClick = async (event) => {
-  if (!view.value || !mapModules.value) return;
-  
-  const Graphic = mapModules.value[3];
-  const geometryEngine = mapModules.value[11];
-  const Point = mapModules.value[12];
-
-  // --- 点击判定优先级 ---
-  const hitTest = await view.value.hitTest(event);
-  const priorityIds = ["house", "town", "district"];
-  let bestFit = null;
-  
-  for (const id of priorityIds) {
-    const layerState = id === 'house' ? houseLayer.value : layers.value.find(l => l.id === id);
-    if (layerState?.visible) {
-      const hit = hitTest.results.find(r => r.graphic?.layer?.id === id);
-      if (hit) { 
-        bestFit = hit.graphic; 
-        break; 
-      }
-    }
-  }
-
-  if (bestFit) {
-    // 判断是否为追加模式（数据比对页面）
-    if (!props.appendMode) {
-      view.value.graphics.removeAll(); 
-    }
-    
-    // 绘制选中的“面”高亮
-    const areaHighlight = new Graphic({
-      geometry: bestFit.geometry,
-      symbol: MAP_CONFIG.styles.highlight
-    });
-    view.value.graphics.add(areaHighlight);
-    highlightRef.value = areaHighlight; 
-
-    try {
-      // --- 范围初筛 (BBOX 请求) ---
-      const bldCfg = MAP_CONFIG.economic.building;
-      const ext = bestFit.geometry.extent;
-      const bbox = `${ext.xmin},${ext.ymin},${ext.xmax},${ext.ymax}`;
-      
-      const response = await fetch(bldCfg.getWfsUrl(bbox));
-      const geojson = await response.json();
-      const candidates = geojson.features || [];
-      
-      const xAxisList = [];
-      const yAxisList = [];
-
-      // --- 空间求交与点高亮 ---
-      candidates.forEach(f => {
-        const pt = new Point({
-          x: f.geometry.coordinates[0],
-          y: f.geometry.coordinates[1],
-          spatialReference: { wkid: 4526 }
-        });
-
-        if (geometryEngine.contains(bestFit.geometry, pt)) {
-          const coordStr = f.properties["坐标"] || "";
-          if (coordStr && coordStr.includes(',')) {
-            const [zx, yx] = coordStr.split(',');
-            xAxisList.push(zx.trim());
-            yAxisList.push(yx.trim());
-
-            // 绘制点高亮
-            const pGraphic = new Graphic({
-              geometry: pt,
-              symbol: MAP_CONFIG.styles.highlightPoint
-            });
-            view.value.graphics.add(pGraphic);
+        if (isVisible) {
+          const hit = hitTest.results.find(r => r.graphic?.layer?.id === id);
+          if (hit) {
+            bestFit = hit.graphic;
+            break;
           }
         }
-      });
+      }
 
-      // ---  转发 Payload ---
-      emit('map-select', {
-        zxAxis: xAxisList.join(','),
-        yxAxis: yAxisList.join(',')
-      });
+      if (bestFit) {
+        if (!props.appendMode) view.value.graphics.removeAll();
 
-    } catch (err) {
-      console.error("空间求交查询失败:", err);
+        // 1. 高亮面
+        view.value.graphics.add(new Graphic({
+          geometry: bestFit.geometry,
+          symbol: MAP_CONFIG.styles.highlightPolygon
+        }));
+
+        // 2. 调用外部查询函数
+        const result = await query(bestFit.geometry, mapModules.value);
+
+        // 3. 渲染结果
+        view.value.graphics.addMany(result.graphics);
+        emit('map-select', { zxAxis: result.zxAxis, yxAxis: result.yxAxis });
+      }
     }
-  } else {
-    // 非追加模式，点击空白清空，追加模式不请空
-    if (!props.appendMode) {
-      view.value.graphics.removeAll();
-      highlightRef.value = null;
-      emit('map-select', { zxAxis: "", yxAxis: "" });
-    }
-  }
-};
 
-    // --- 供外部调用的方法（转发到 BuildingLayer 子组件） ---
+    // --- 暴露给外部调用的方法 ---
     const fetchBuildingPoints = async (params) => {
-      if (buildingLayerRef.value?.fetchBuildingPoints) {
-        return await buildingLayerRef.value.fetchBuildingPoints(params);
-      } else {
-        console.warn("BuildingLayer 还未准备好方法");
-      }
+      return await buildingLayerRef.value?.fetchBuildingPoints(params);
     };
-    const loadBuildingPoints = (data) => buildingLayerRef.value?.loadBuildingPoints(data);
-    const queryBuildingPoints = (cond) => buildingLayerRef.value?.queryBuildingPoints(cond);
 
-    // 底图和图层控制方法
     const handleBasemapChange = (id) => {
-      const Basemap = mapModules.value[5];
-      const TileLayer = mapModules.value[6];
+      const [, , , , , Basemap, TileLayer] = mapModules.value;
       view.value.map.basemap = new Basemap({
         baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps[id], visible: basemapVisible.value })],
         id: id
@@ -377,15 +263,13 @@ const handleMapClick = async (event) => {
     };
 
     const updateLayerVisibility = (layer) => {
-      if (layer.instance) {
-        layer.instance.visible = layer.visible;
-      }
+      if (layer.instance) layer.instance.visible = layer.visible;
     };
+
     const updateBasemapVisibility = () => {
       view.value.map.basemap.baseLayers.forEach(lyr => lyr.visible = basemapVisible.value);
     };
 
-    const togglePanel = () => panelVisible.value = !panelVisible.value;
     onMounted(initializeMap);
     onUnmounted(() => { if (view.value) view.value.destroy(); });
 
@@ -396,19 +280,17 @@ const handleMapClick = async (event) => {
     });
 
     return {
-      view, mapModules, mapIsReady, buildingLayerRef, buildingLayerState, heatmapVisible,
-      panelVisible, boundaryLayers, houseLayer, mapList: MAP_CONFIG.basemapUI, mapToolsRef,
-      activeBasemapId, basemapVisible, togglePanel: () => panelVisible.value = !panelVisible.value,
-      updateLayerVisibility, clearMapTools,
+      view, mapModules, mapIsReady, buildingLayerRef, layersState,
+      panelVisible, boundaryLayers, mapList, mapToolsRef,
+      activeBasemapId, basemapVisible,
+      togglePanel: () => panelVisible.value = !panelVisible.value,
+      handleBuildingToggle,
+      updateLayerLoading,
+      updateLayerVisibility,
       handleBasemapChange,
+      updateBasemapVisibility,
       handleMapSelect: (payload) => emit('map-select', payload),
-      fetchBuildingPoints: (p) => buildingLayerRef.value?.fetchBuildingPoints(p),
-      loadBuildingPoints: (d) => buildingLayerRef.value?.loadBuildingPoints(d),
-      queryBuildingPoints: (c) => buildingLayerRef.value?.queryBuildingPoints(c),
-      getMapView: () => view.value,
-      updateBasemapVisibility: () => {
-        view.value.map.basemap.baseLayers.forEach(lyr => lyr.visible = basemapVisible.value);
-      },
+      getMapView: () => view.value
     };
   }
 };
