@@ -26,7 +26,7 @@ const props = defineProps({
   filterParams: { type: Object, default: () => ({}) }
 });
 
-const emit = defineEmits(['map-select']);
+const emit = defineEmits(['map-select', 'clear']);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
 const selectedGroups = ref<Array<{ zxAxis: string, yxAxis: string }>>([]);
 
@@ -68,6 +68,7 @@ const clearGroups = () => {
   if (mapView.value) {
     mapView.value.clearMapTools();
   }
+  emit('clear');
 };
 </script>
 

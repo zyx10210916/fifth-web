@@ -75,11 +75,18 @@ const handleFilterApply = (filters: any) => {
 </script>
 
 <style scoped lang="less">
+:host { 
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .dynamic-comp {
-  height: calc(100% - 60px); 
+  flex: 1; 
   overflow: hidden;
   padding: 10px 0px; 
   background: #f5f5f5;
+  display: flex;
 }
 
 .custom-tabs {

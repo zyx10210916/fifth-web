@@ -1,6 +1,6 @@
 <template>
   <div :class="['map-container']">
-    <div id="viewDiv" style="width: 100%; height: 100vh; position: relative;">
+    <div id="viewDiv" style="width: 100%; height: 100%; position: relative;">
       <div v-if="loading" class="loading-overlay">
         <div class="loading-content">
           <div class="spinner"></div>
@@ -165,6 +165,7 @@ export default {
       }
     };
 
+    //--- 初始化地图 ---//
     const initializeMap = async () => {
       try {
         const moduleEntries = Object.entries(MAP_CONFIG.modules);
@@ -218,6 +219,10 @@ export default {
 
     //--- 处理地图点击事件 ---//
     const handleMapClick = async (event) => {
+      if (mapToolsRef.value && mapToolsRef.value.isWorking) {
+        return; 
+      }
+
       if (!view.value || !mapModules.value) return;
       const { Graphic } = mapModules.value;
 
@@ -245,6 +250,7 @@ export default {
         let result;
 
         if (layerId === 'building') {
+          // 提取“坐标”字段
           const coordStr = attrs["坐标"] || "";
           const [zx, yx] = coordStr.split(',').map(s => s.trim());
 
@@ -272,6 +278,13 @@ export default {
 
         if (result.graphics) view.value.graphics.addMany(result.graphics);
         emit('map-select', { zxAxis: result.zxAxis, yxAxis: result.yxAxis });
+      } else {
+        // 非追加模式，点击空白处清空
+        if (!props.appendMode) {
+          view.value.graphics.removeAll();
+          view.value.popup.close();
+          emit('map-select', { zxAxis: "", yxAxis: "" });
+        }
       }
     };
 

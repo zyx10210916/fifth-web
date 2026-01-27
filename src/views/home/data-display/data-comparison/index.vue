@@ -1,7 +1,7 @@
 <template>
   <div class="main-content">
     <LeftPanel class="left-panel" :summary-data="apiData" />
-    <MiddleMap class="map-center" @map-select="handleStartComparison" />
+    <MiddleMap class="map-center" @map-select="handleStartComparison" @clear="() => fetchData()" />
     <RightPanel class="right-panel" :summary-data="apiData" />
   </div>
 </template>
