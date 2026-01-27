@@ -28,6 +28,7 @@
 <script>
 import { ref, watch, onUnmounted, onMounted, shallowRef, computed } from 'vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { getHeatmap } from '@/api/data-display/mapCache';
 
 const FIELD_CONFIG = {
   total_coun: { min: 1, max: 17656, label: '家' },
@@ -36,7 +37,6 @@ const FIELD_CONFIG = {
   yylr_sum_s: { min: -12856095, max: 31060063, label: '元' },
   yysr_sum_s: { min: 0, max: 601751463, label: '元' }
 };
-let cachedHeatmapData = null;
 
 export default {
   name: 'HeatmapLayerManager',
@@ -73,31 +73,18 @@ export default {
 
     const fetchHeatmapData = async () => {
       if (heatmapData.value.length > 0 || isFetching.value) return;
-      // 如果已经有缓存，直接使用
-      if (cachedHeatmapData) {
-        heatmapData.value = cachedHeatmapData;
-        if (props.visible) refreshHeatmap();
-        return;
-      }
       try {
         isFetching.value = true;
         emit('loading-status', true);
 
-        const url = MAP_CONFIG.economic.heatmap.url; 
-        const response = await fetch(url);
-        const geojson = await response.json();
-        cachedHeatmapData = geojson.features || []; // 存入持久变量
-        heatmapData.value = cachedHeatmapData;
+        const data = await getHeatmap();// 从缓存获取热力图点数据
+        heatmapData.value = data.features || [];
         
-        // 如果数据回来时用户已经开启了开关，则直接渲染
-        if (props.visible) {
-          refreshHeatmap();
-        }
+        if (props.visible) refreshHeatmap();
       } catch (e) {
         console.error("热力图数据请求失败:", e);
       } finally {
         isFetching.value = false;
-        // 请求结束（无论成功失败）关闭加载提示
         emit('loading-status', false); 
       }
     };
@@ -151,7 +138,7 @@ export default {
       removeLayer();
 
       heatmapLayer.value = new FeatureLayer({
-        id: "dynamic_heatmap_layer",
+        id: "HeatmapLayer",
         source: graphics, 
         objectIdField: "ObjectId",
         fields: [
@@ -172,7 +159,6 @@ export default {
       fetchHeatmapData();
     });
 
-    // 监听显隐，只负责渲染控制
     watch(() => props.visible, (newVal) => {
       if (newVal) {
         refreshHeatmap();
@@ -224,7 +210,6 @@ export default {
   margin-right: 12px;
 }
 
-/* 图例增强样式 */
 .heatmap-legend {
   width: 100%;
   display: flex;

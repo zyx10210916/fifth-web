@@ -1,6 +1,7 @@
 <script>
 import { ref, watch, onUnmounted, markRaw, shallowRef, onMounted } from 'vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { getBuilding } from '@/api/data-display/mapCache';
 
 export default {
   name: 'BuildingLayer',
@@ -23,8 +24,7 @@ export default {
         isLoading.value = true;
         emit('loading-status', true);
 
-        const response = await fetch(bldCfg.url);
-        const geojson = await response.json();
+        const geojson = await getBuilding();// 从缓存获取建筑点数据
         const features = geojson.features || [];
 
         const { FeatureLayer, Graphic } = props.modules;

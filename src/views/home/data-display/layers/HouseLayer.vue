@@ -1,6 +1,7 @@
 <script>
 import { shallowRef, watch, onUnmounted, onMounted } from 'vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { getHouse } from '@/api/data-display/mapCache';
 
 export default {
   name: 'HouseLayer',
@@ -17,8 +18,7 @@ export default {
       emit('loading-status', true);
       const { FeatureLayer, Graphic } = props.modules;
       try {
-        const response = await fetch(MAP_CONFIG.economic.house.url);
-        const data = await response.json();
+        const data = await getHouse();// 从缓存获取房屋多边形数据
         
         const graphics = data.features.map((f, i) => new Graphic({
           geometry: { 
