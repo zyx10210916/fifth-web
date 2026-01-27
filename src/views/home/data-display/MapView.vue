@@ -92,7 +92,8 @@ import BuildingLayer from './layers/BuildingLayer.vue';
 import HeatmapLayer from './layers/HeatmapLayer.vue';
 import HouseLayer from './layers/HouseLayer.vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
-import { query } from '@/utils/mapQuery';
+import { mapPopup } from '@/hooks/mapPopup';
+import { mapQuery } from '@/utils/mapQuery';
 
 export default {
   name: 'MapView',
@@ -118,6 +119,7 @@ export default {
     const activeBasemapId = ref('street');
     const mapToolsRef = ref(null);
     const layers = ref([]);
+    const { showPopup } = mapPopup(view, mapModules);
 
     // 目录树用的计算属性
     const boundaryLayers = computed(() => layers.value.filter(l => l.type === 'boundary'));
@@ -243,25 +245,29 @@ export default {
         let result;
 
         if (layerId === 'building') {
-          // 提取“坐标”字段
           const coordStr = attrs["坐标"] || "";
           const [zx, yx] = coordStr.split(',').map(s => s.trim());
 
-          // 只有在有点坐标时才高亮并查询
+          // 点高亮
           view.value.graphics.add(new Graphic({
             geometry: bestFit.geometry,
             symbol: MAP_CONFIG.styles.highlightPoint
           }));
 
-          // 点查询：直接传坐标
-          result = await query(bestFit.geometry, mapModules.value, { zxAxis: zx, yxAxis: yx });
+          // 调用弹窗方法
+          if (zx && yx) {
+            await showPopup({ zxAxis: zx, yxAxis: yx }, event.mapPoint, true);
+          }
+
+          // 点查询
+          result = await mapQuery(bestFit.geometry, mapModules.value, { zxAxis: zx, yxAxis: yx });
         } else {
           // 面查询
           view.value.graphics.add(new Graphic({
             geometry: bestFit.geometry,
             symbol: MAP_CONFIG.styles.highlightPolygon
           }));
-          result = await query(bestFit.geometry, mapModules.value);
+          result = await mapQuery(bestFit.geometry, mapModules.value);
         }
 
         if (result.graphics) view.value.graphics.addMany(result.graphics);

@@ -21,7 +21,7 @@
 <script>
 import { ref, shallowRef, onUnmounted } from 'vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
-import { query } from '@/utils/mapQuery';
+import { mapQuery } from '@/utils/mapQuery';
 
 export default {
   name: 'MapTools',
@@ -185,7 +185,7 @@ export default {
     // 高亮选中及发送查询逻辑
     const querySelectedPoints = async (geometry) => {
       const { Graphic } = props.modules;
-      const result = await query(geometry, props.modules);
+      const result = await mapQuery(geometry, props.modules);
 
       if (!props.appendMode) {
         measureLayer.value.removeAll();

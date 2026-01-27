@@ -11,6 +11,7 @@
 import { ref, shallowRef, watch } from 'vue';
 import MapView from '../MapView.vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { mapPopup } from '@/hooks/mapPopup';
 
 const props = defineProps<{
   selectedUnit?: any;
@@ -23,6 +24,7 @@ const emit = defineEmits(['map-select']);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
 const mapModules = shallowRef<any>(null);
 const highlightRef = shallowRef<any>(null);
+const { showPopup } = mapPopup(mapView, mapModules);
 
 // 高亮选中单位
 const highlightUnit = (unit: any) => {
@@ -59,18 +61,7 @@ const highlightUnit = (unit: any) => {
     highlightRef.value = highlightGraphic;
 
     // 弹出信息窗
-    view.popup.open({
-      title: unit.B102 || '单位信息',
-      content: `
-        <div style="font-size:14px; line-height: 1.6; padding: 5px;">
-          <p><b>统一社会信用代码:</b> ${unit.B109 || '-'}</p>
-          <p><b>主要业务活动:</b> ${unit.B1031 || '-'}</p>
-          <p><b>资产总计:</b> ${unit.ZCZJ || 0} 万元</p>
-          <p><b>地址:</b> ${unit.B1056 || '-'}</p>
-        </div>
-      `,
-      location: pointGeometry
-    });
+    showPopup(unit, pointGeometry, false);
     
     view.goTo({ target: pointGeometry, zoom: 16 });
 

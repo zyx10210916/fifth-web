@@ -6,7 +6,7 @@ import { MAP_CONFIG } from '@/config/mapConfig';
  * @param modules 语义化模块对象
  * @param extraParams 额外参数。若包含 zxAxis/yxAxis 则直接作为结果返回，跳过网络请求。
  */
-export async function query(geometry: any, modules: any, extraParams: any = {}) {
+export async function mapQuery(geometry: any, modules: any, extraParams: any = {}) {
   const { Graphic, Point, geometryEngine } = modules;
   const bldCfg = MAP_CONFIG.economic.building;
 
