@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia';
-import { login as userLogin, logout as userLogout, getUserProfile, LoginData } from '@/api/user/index';
-import { setToken, clearToken } from '@/utils/auth';
+import { 
+  login as userLogin, 
+  logout as userLogout, 
+  getUserProfile, 
+  getToken as refreshTokenApi,
+  LoginData 
+} from '@/api/user/index';
+import { setToken, setRefreshToken, getRefreshToken, clearToken } from '@/utils/auth';
 import { UserState } from './types';
 
 export const useUserStore = defineStore('user', {
@@ -40,24 +46,55 @@ export const useUserStore = defineStore('user', {
     // 获取用户信息
     async info() {
       const result = await getUserProfile();
-      this.setInfo(result);
+      this.setInfo({
+        user_name: result.user.fullName,
+        role: result.user.admin ? 'admin' : 'user'
+      });
     },
-    // 异步登录并存储token
+
+    // 登录
     async login(loginForm: LoginData) {
-      const result = await userLogin(loginForm);
-      const token = result?.token;
-      if (token) {
-        setToken(token);
+      const result: any = await refreshTokenApi({
+        username: loginForm.username,
+        password: loginForm.password,
+        grant_type: 'password'
+      } as any);
+
+      const data = result?.data || result;
+      if (data && data.access_token) {
+        setToken(`Bearer ${data.access_token}`); // 存 access
+        if (data.refresh_token) {
+          setRefreshToken(data.refresh_token); // 存 refresh
+        }
+        return data;
       }
-      return result;
+      throw new Error('登录失败');
     },
-    // Logout
+
+    // 刷新 Token
+    async refreshTokenAction() {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) throw new Error('Refresh token missing');
+
+      const result: any = await refreshTokenApi({
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+        scope:'all'
+      } as any);
+
+      const data = result?.data || result;
+      if (data.access_token) setToken(`Bearer ${data.access_token}`);
+      if (data.refresh_token) setRefreshToken(data.refresh_token);
+    },
+
+    // 登出
     async logout() {
-      await userLogout();
-      this.resetInfo();
-      clearToken();
-      // 路由表重置
-      // location.reload();
+        try {
+          await userLogout();
+        } finally {
+          this.resetInfo();
+          clearToken();
+        }
+      },
     },
-  },
-});
+  });

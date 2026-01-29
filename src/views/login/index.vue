@@ -97,27 +97,39 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
-import { login, getToken } from '@/api/user/index';
-import { setToken } from '@/utils/auth';
 import { message, type FormInstance } from 'ant-design-vue';
+// 导入 Store
+import { useUserStore } from '@/store/modules/user'; 
 import Header from '../../components/Header/index.vue';
 
 const router = useRouter();
+const userStore = useUserStore(); // 初始化 Store，解决“找不到名称 userStore”
 const formRef = ref<FormInstance>();
 const loading = ref(false);
 
-// 登录表单数据
+// 1. 修复类型报错：给 reactive 指定明确的结构，解决“不存在属性 username/password/captcha”
 const loginForm = reactive({
+  username: '',
+  password: '',
+  captcha: ''
 });
 
-// 表单验证规则
+// 2. 修复“已声明但从未读取”：将 rules 绑定到 a-form 的 :rules 属性上（模板中需要添加）
 const loginRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' }
-  ]
+  ],
+  // captcha: [
+  //   { required: true, message: '请输入验证码', trigger: 'blur' }
+  // ]
+};
+
+// 刷新验证码
+const handleCaptchaClick = () => {
+  console.log('刷新验证码');
 };
 
 // 处理登录
@@ -126,26 +138,20 @@ const handleLogin = async () => {
     await formRef.value?.validate();
     loading.value = true;
 
-    // 使用getToken函数调用实际的认证API
-    const result = await getToken({
+    // 调用 Store 动作，它内部会通过 token 接口同时存下 access_token 和 refresh_token
+    await userStore.login({
       username: loginForm.username,
       password: loginForm.password
     });
-    console.log("result"+result)
-    if (result && result.data.access_token) {
-      console.log(result)
-      // 登录成功后设置token
-      setToken(`Bearer ${result.data.access_token}`);
-      console.log("登陆的token："+result.data.access_token)
-      // 跳转到首页
-      router.push('/home');
-    } else {
-      console.error('登录失败: 未获取到token');
-    }
-  } catch (error) {
-    // alert("登陆失败")
-    message.error('登录失败')
-    console.error('登录失败:', error);
+
+    message.success('登录成功');
+    router.push('/home');
+  } catch (error: any) {
+    // 如果是表单验证失败，不需要弹出错误消息
+    if (error?.errorFields) return;
+    
+    message.error(error.message || '登录失败');
+    console.error('登录过程发生错误:', error);
   } finally {
     loading.value = false;
   }

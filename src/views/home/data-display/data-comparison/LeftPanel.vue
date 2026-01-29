@@ -167,7 +167,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
-  [chart1, chart2, chart3].forEach(c => c?.dispose());
+  [chart1, chart2, chart3].forEach(c => {
+    c?.dispose();
+  });
+  chart1 = chart2 = chart3 = null;
 });
 
 const handleResize = () => [chart1, chart2, chart3].forEach(c => c?.resize());

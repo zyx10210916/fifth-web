@@ -46,7 +46,7 @@ export default {
 
         props.view.map.add(layerInstance.value);
 
-        const chunkSize = 5000;
+        const chunkSize = 2000;
         for (let i = 0; i < features.length; i += chunkSize) {
           const chunk = features.slice(i, i + chunkSize);
           const graphics = chunk.map((f, index) => {

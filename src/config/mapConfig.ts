@@ -73,7 +73,7 @@ export const MAP_CONFIG = {
     },
     house: {
       id: "house",
-      url: createWfsUrl("workspace:WJPFWMpc38")
+      url: createWfsUrl("workspace:WJPFWMpc38", { propertyName: "the_geom" })
     },
     heatmap: {
       id: "heatmap",
@@ -111,7 +111,7 @@ export const MAP_CONFIG = {
       type: "simple-marker",
       style: "circle",
       color: [255, 68, 0, 0.9],
-      size: 3.571,
+      size: 5,
       outline: { color: [255, 255, 255], width: 1 }
     },
     // 拉框工具的矩形样式

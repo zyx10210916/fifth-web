@@ -24,13 +24,11 @@
   </a-tabs>
 
   <div class="dynamic-comp">
-    <keep-alive>
     <component 
       :is="activeComponent" 
       :filter-params="filterParams" 
       @update-params="handleFilterApply" 
     />
-    </keep-alive>
   </div>
 
   <FilterModal 
@@ -75,14 +73,14 @@ const handleFilterApply = (filters: any) => {
 </script>
 
 <style scoped lang="less">
-:host { 
+:host{
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
 .dynamic-comp {
-  flex: 1; 
+  flex: 1;
   overflow: hidden;
   padding: 10px 0px; 
   background: #f5f5f5;

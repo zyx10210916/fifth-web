@@ -189,8 +189,7 @@ export default {
 
         const map = new Map({
           basemap: new Basemap({
-            // baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
-            baseLayers: null,
+            baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
             id: "street"
           })
         });
@@ -207,7 +206,7 @@ export default {
           await nextTick();
 
           // 边界加载
-          // await loadBoundaryLayers(map);
+          await loadBoundaryLayers(map);
 
           view.value.on("click", handleMapClick);
           emit('map-loaded', { view: view.value, map, modules: mapModules.value });
@@ -220,7 +219,7 @@ export default {
     //--- 处理地图点击事件 ---//
     const handleMapClick = async (event) => {
       if (mapToolsRef.value && mapToolsRef.value.isWorking) {
-        return; 
+        return;
       }
 
       if (!view.value || !mapModules.value) return;
@@ -308,7 +307,20 @@ export default {
     };
 
     onMounted(initializeMap);
-    onUnmounted(() => { if (view.value) view.value.destroy(); });
+    onUnmounted(() => {
+      if (view.value) {
+        console.log('正在清理地图资源...');
+        if (view.value.map) {
+          view.value.map.layers?.removeAll();
+        }
+        if (view.value.graphic) {
+          view.value.graphic.removeAll();
+        }
+        view.value.destroy();
+        view.value.container = null;
+        view.value = null;
+      }
+    });
 
     expose({
       getMapView: () => view.value,

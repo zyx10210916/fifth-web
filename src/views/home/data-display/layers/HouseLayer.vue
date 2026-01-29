@@ -19,8 +19,9 @@ export default {
       const { FeatureLayer, Graphic } = props.modules;
       try {
         const data = await getHouse();// 从缓存获取房屋多边形数据
+        const frozenFeatures = Object.freeze(data.features);
         
-        const graphics = data.features.map((f, i) => new Graphic({
+        const graphics = frozenFeatures.map((f, i) => new Graphic({
           geometry: { 
             type: "polygon", 
             rings: f.geometry.type === "MultiPolygon" ? f.geometry.coordinates.flat(1) : f.geometry.coordinates,

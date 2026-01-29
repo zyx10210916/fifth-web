@@ -159,6 +159,11 @@ export default {
       fetchHeatmapData();
     });
 
+    onUnmounted(() => {
+      removeLayer();
+      heatmapData.value = []; 
+    });
+
     watch(() => props.visible, (newVal) => {
       if (newVal) {
         refreshHeatmap();
@@ -168,9 +173,6 @@ export default {
     });
 
     watch(() => selectedField.value, refreshHeatmap);
-
-    onUnmounted(removeLayer);
-
     return { selectedField, legendInfo, formatVal };
   }
 };

@@ -182,6 +182,13 @@ const processData = () => {
   }
 };
 
+
+const handleResize = () => {
+  chart1?.resize();
+  chart2?.resize();
+};
+
+// 初始化图表
 onMounted(() => {
   if (personnelChartRef.value) {
     chart1 = echarts.init(personnelChartRef.value);
@@ -192,10 +199,22 @@ onMounted(() => {
     chart2.setOption(getCommonOption());
   }
   processData();
-  window.addEventListener('resize', () => {
-    chart1?.resize();
-    chart2?.resize();
-  });
+  
+  window.addEventListener('resize', handleResize);
+});
+
+// 在销毁时彻底清理
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+  
+  if (chart1) {
+    chart1.dispose();
+    chart1 = null;
+  }
+  if (chart2) {
+    chart2.dispose();
+    chart2 = null;
+  }
 });
 
 watch(() => props.summaryData, () => {
