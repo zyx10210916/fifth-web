@@ -17,66 +17,97 @@ export default {
     const hasLoaded = ref(false);
     const bldCfg = MAP_CONFIG.economic.building;
 
-    const initFullMode = async () => {
-      if (hasLoaded.value || isLoading.value) return;
+    //初始化加载WMS数据
+   const initWMSLayer = () => {
+      const { WMSLayer } = props.modules;
+      if (!WMSLayer) return;
 
-      try {
-        isLoading.value = true;
-        emit('loading-status', true);
+      layerInstance.value = new WMSLayer({
+        id: bldCfg.id,
+        url: bldCfg.wmsUrl,
+        sublayers: [{ 
+          name: bldCfg.layerName 
+        }],
+        customParameters: {
+          "TRANSPARENT": "true",
+          "VERSION": bldCfg.wmsVersion,
+          "SRS": "EPSG:4526"
+        },
+        visible: props.visible
+      });
 
-        const geojson = await getBuilding();// 从缓存获取建筑点数据
-        const features = geojson.features || [];
-
-        const { FeatureLayer, Graphic } = props.modules;
-
-        layerInstance.value = markRaw(new FeatureLayer({
-          id: bldCfg.id,
-          source: [], 
-          objectIdField: "ObjectId",
-          geometryType: "point",
-          fields: [
-            { name: "ObjectId", type: "oid" },
-            { name: "坐标", type: "string" }
-          ],
-          outFields: ["*"], 
-          renderer: { type: "simple", symbol: MAP_CONFIG.styles.building },
-          spatialReference: { wkid: 4526 },
-          visible: props.visible
-        }));
-
-        props.view.map.add(layerInstance.value);
-
-        const chunkSize = 2000;
-        for (let i = 0; i < features.length; i += chunkSize) {
-          const chunk = features.slice(i, i + chunkSize);
-          const graphics = chunk.map((f, index) => {
-            const coords = f.geometry.coordinates;
-            return new Graphic({
-              geometry: { type: "point", x: parseFloat(coords[0]), y: parseFloat(coords[1]), spatialReference: { wkid: 4526 } },
-              attributes: { 
-                ObjectId: i + index + 1,
-                "坐标": f.properties["坐标"] || "" 
-              }
-            });
-          });
-
-          await layerInstance.value.applyEdits({ addFeatures: graphics });
-        }
-
-        hasLoaded.value = true;
-        emit('loaded', geojson);
-      } catch (err) {
-        console.error("企业建筑点加载失败:", err);
-      } finally {
-        isLoading.value = false;
-        emit('loading-status', false);
-      }
+      props.view.map.add(layerInstance.value);
+      emit('loading-status', false);
     };
 
-    onMounted(() => { props.view.when(initFullMode); });
-    watch(() => props.visible, (val) => { if (layerInstance.value) layerInstance.value.visible = val; });
-    onUnmounted(() => { if (layerInstance.value) props.view.map.remove(layerInstance.value); });
-    
+    //初始化加载WFS数据
+    // const initWFSLayer = async () => {
+    //   if (hasLoaded.value || isLoading.value) return;
+
+    //   try {
+    //     isLoading.value = true;
+    //     emit('loading-status', true);
+
+    //     const geojson = await getBuilding();// 从缓存获取建筑点数据
+    //     const features = geojson.features || [];
+
+    //     const { FeatureLayer, Graphic } = props.modules;
+
+    //     layerInstance.value = markRaw(new FeatureLayer({
+    //       id: bldCfg.id,
+    //       source: [], 
+    //       objectIdField: "ObjectId",
+    //       geometryType: "point",
+    //       fields: [
+    //         { name: "ObjectId", type: "oid" },
+    //         { name: "坐标", type: "string" }
+    //       ],
+    //       outFields: ["*"], 
+    //       renderer: { type: "simple", symbol: MAP_CONFIG.styles.building },
+    //       spatialReference: { wkid: 4526 },
+    //       visible: props.visible
+    //     }));
+
+    //     props.view.map.add(layerInstance.value);
+
+    //     const chunkSize = 2000;
+    //     for (let i = 0; i < features.length; i += chunkSize) {
+    //       const chunk = features.slice(i, i + chunkSize);
+    //       const graphics = chunk.map((f, index) => {
+    //         const coords = f.geometry.coordinates;
+    //         return new Graphic({
+    //           geometry: { type: "point", x: parseFloat(coords[0]), y: parseFloat(coords[1]), spatialReference: { wkid: 4526 } },
+    //           attributes: { 
+    //             ObjectId: i + index + 1,
+    //             "坐标": f.properties["坐标"] || "" 
+    //           }
+    //         });
+    //       });
+
+    //       await layerInstance.value.applyEdits({ addFeatures: graphics });
+    //     }
+
+    //     hasLoaded.value = true;
+    //     emit('loaded', geojson);
+    //   } catch (err) {
+    //     console.error("企业建筑点加载失败:", err);
+    //   } finally {
+    //     isLoading.value = false;
+    //     emit('loading-status', false);
+    //   }
+    // };
+
+    onMounted(() => { 
+      props.view.when(initWMSLayer); 
+    });
+
+    watch(() => props.visible, (val) => { 
+      if (layerInstance.value) layerInstance.value.visible = val; 
+    });
+
+    onUnmounted(() => { 
+      if (layerInstance.value) props.view.map.remove(layerInstance.value); 
+    });
     return () => null;
   }
 };

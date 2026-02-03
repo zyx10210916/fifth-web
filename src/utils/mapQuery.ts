@@ -2,31 +2,21 @@ import { MAP_CONFIG } from '@/config/mapConfig';
 
 /**
  * 空间查询逻辑
- * @param geometry 空间几何体
+ * @param geometry 空间几何体 
  * @param modules 语义化模块对象
- * @param extraParams 额外参数。若包含 zxAxis/yxAxis 则直接作为结果返回，跳过网络请求。
  */
-export async function mapQuery(geometry: any, modules: any, extraParams: any = {}) {
+export async function mapQuery(geometry: any, modules: any) {
   const { Graphic, Point, geometryEngine } = modules;
   const bldCfg = MAP_CONFIG.economic.building;
 
-  // --- 点选建筑点时，直接返回已有坐标 ---
-  if (extraParams.zxAxis && extraParams.yxAxis) {
-    return {
-      zxAxis: extraParams.zxAxis,
-      yxAxis: extraParams.yxAxis,
-      graphics: [new Graphic({
-        geometry: geometry, // 使用点击到的 Point 几何
-        symbol: MAP_CONFIG.styles.highlightPoint
-      })]
-    };
-  }
+  // 统一获取查询范围的 BBox
+  const ext = geometry.type === "point" ? geometry.extent : geometry.extent;
+  if (!ext) return { zxAxis: "", yxAxis: "", graphics: [] };
 
-  // --- 面选（房屋面/行政区），执行 BBOX 初筛和精确包含判定 ---
-  const ext = geometry.extent;
   const bbox = `${ext.xmin},${ext.ymin},${ext.xmax},${ext.ymax}`;
   
   try {
+    // 请求 WFS/BBOX 接口获取最新点数据
     const response = await fetch(bldCfg.bboxUrl(bbox));
     const geojson = await response.json();
     const candidates = geojson.features || [];
@@ -42,17 +32,23 @@ export async function mapQuery(geometry: any, modules: any, extraParams: any = {
         spatialReference: { wkid: 4526 }
       });
 
-      // 判定点是否在面内
+      // 判定点是否在传入的几何范围内
       if (geometryEngine.contains(geometry, pt)) {
         const coordStr = f.properties["坐标"] || "";
         if (coordStr.includes(',')) {
-          const [zx, yx] = coordStr.split(',');
-          xAxisList.push(zx.trim());
-          yAxisList.push(yx.trim());
+          const [zx, yx] = coordStr.split(',').map((s: string) => s.trim());
+          xAxisList.push(zx);
+          yAxisList.push(yx);
 
+          // 将 properties 赋值给 attributes
           graphics.push(new Graphic({
             geometry: pt,
-            symbol: MAP_CONFIG.styles.highlightPoint
+            symbol: MAP_CONFIG.styles.highlightPoint,
+            attributes: {
+              ...f.properties,
+              // 坐标字段统一存储格式
+              "坐标": `${zx},${yx}` 
+            }
           }));
         }
       }

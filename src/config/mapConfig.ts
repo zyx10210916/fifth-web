@@ -6,7 +6,13 @@ import dtActive from "@/assets/images/dt-2.png";
 import yxtNormal from "@/assets/images/yxt-1.png";
 import yxtActive from "@/assets/images/yxt-2.png";
 
+
 const GEOSERVER_BASE = "http://10.44.58.28:8089/geoserver/workspace";
+// const GEOSERVER_BASE = "http://192.168.10.123:8089/geoserver/dataCenterWorkspace";
+const BuildingLayer_Name = "workspace:juheshujupc38";
+const HouseLayer_Name = "workspace:WJPFWMpc38";
+const HeatMapLayer_Name = "workspace:yuwangshuju";
+
 
 /**
  * 统一 WFS URL 构造器
@@ -34,6 +40,9 @@ export const MAP_CONFIG = {
   arcgis: {
     js: "http://10.44.58.28:8000/4.19/init.js",
     css: "http://10.44.58.28:8000/4.19/esri/themes/light/main.css"
+    // js: "http://192.168.94.114/4.19/init.js",
+    // css: "http://192.168.94.114/4.19/esri/themes/light/main.css"
+
   },
 
   // 需要加载的 ArcGIS 模块
@@ -45,8 +54,10 @@ export const MAP_CONFIG = {
     'esri/geometry/SpatialReference': 'SpatialReference',
     'esri/Basemap': 'Basemap',
     'esri/layers/TileLayer': 'TileLayer',
+    'esri/layers/WMSLayer': 'WMSLayer',
     'esri/geometry/geometryEngine': 'geometryEngine',
     'esri/geometry/Point': 'Point',
+    'esri/geometry/Extent': 'Extent',
     'esri/views/draw/Draw': 'Draw',
     'esri/widgets/Sketch/SketchViewModel': 'SketchViewModel',
     'esri/layers/GraphicsLayer': 'GraphicsLayer',
@@ -66,18 +77,22 @@ export const MAP_CONFIG = {
   economic: {
     building: {
       id: "building",
-      // 提供构造函数供特定 BBOX 查询使用（拉框和面点选查询）
-      bboxUrl: (bbox: string) => createWfsUrl("workspace:juheshujupc38", { bbox }),
-      // 全量建筑点加载：不带 bbox，只查坐标字段以减小体积
-      url: createWfsUrl("workspace:juheshujupc38", { propertyName: "the_geom,坐标" })
+      layerName: BuildingLayer_Name,
+      //  BBOX 查询（拉框和面点选查询）
+      bboxUrl: (bbox: string) => createWfsUrl(BuildingLayer_Name, { bbox }),
+      // wfs查询
+      url: createWfsUrl(BuildingLayer_Name, { propertyName: "the_geom,坐标" }),
+      // wms查询
+      wmsUrl: `${GEOSERVER_BASE}/wms`,
+      wmsVersion: "1.1.0"
     },
     house: {
       id: "house",
-      url: createWfsUrl("workspace:WJPFWMpc38", { propertyName: "the_geom" })
+      url: createWfsUrl(HouseLayer_Name, { propertyName: "the_geom" })
     },
     heatmap: {
       id: "heatmap",
-      url: createWfsUrl("workspace:yuwangshuju")
+      url: createWfsUrl(HeatMapLayer_Name)
     }
   },
 

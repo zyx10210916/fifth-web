@@ -118,33 +118,32 @@ const processData = () => {
   });
 };
 
-onMounted(() => {
-nextTick(()=>{
-  if (assetChartRef.value) {
-    assetChart = echarts.init(assetChartRef.value);
-  }
-  if (profitChartRef.value) { 
-    profitChart = echarts.init(profitChartRef.value);
-  }
-  processData();
-  });
-
-  window.addEventListener('resize', () => {
-    assetChart?.resize();
-    profitChart?.resize();
-  });
-});
-
-onUnmounted(()=>{
-  window.removeEventListener('resize', handleResize);
-  assetChart?.dispose();
-  profitChart?.dispose();
-});
-
 const handleResize = () =>{
   assetChart?.resize();
   profitChart?.resize();
 }
+
+onMounted(() => {
+  nextTick(() => {
+    if (assetChartRef.value) assetChart = echarts.init(assetChartRef.value);
+    if (profitChartRef.value) profitChart = echarts.init(profitChartRef.value);
+    processData();
+  });
+  window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+  
+  if (assetChart) {
+    assetChart.dispose();
+    assetChart = null;
+  }
+  if (profitChart) {
+    profitChart.dispose();
+    profitChart = null;
+  }
+});
 
 watch(() => props.summaryData, processData, { deep: true });
 </script>
