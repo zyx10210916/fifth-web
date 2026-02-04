@@ -28,6 +28,7 @@
       :is="activeComponent" 
       :filter-params="filterParams" 
       @update-params="handleFilterApply" 
+      @clear-area="handleClearAreaOnly"
     />
   </div>
 
@@ -65,6 +66,14 @@ const handleTabChange = (key: string) => {
 
 const showFilterModal = () => {
   filterVisible.value = true;
+};
+
+const handleClearAreaOnly = () => {
+  if (filterParams.value && filterParams.value['area']) {
+    const newParams = { ...filterParams.value };
+    delete newParams['area'];
+    filterParams.value = newParams;
+  }
 };
 
 const handleFilterApply = (filters: any) => {

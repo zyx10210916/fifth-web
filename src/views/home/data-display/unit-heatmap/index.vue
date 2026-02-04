@@ -22,7 +22,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import LeftPanel from './LeftPanel.vue';
 import RightMap from './RightMap.vue';
-import { getUnitHeatMap } from '@/api/data-display';
+import { fetchBusinessData } from '@/api/data-display';
 
 const props = defineProps<{
   filterParams?: any;
@@ -38,9 +38,10 @@ const unitListData = ref({
 
 const listLoading = ref(false);
 const mapLoading = ref(false);
-const currentAxes = ref({ zxAxis: "", yxAxis: "" });
+const currentAxes = ref({ zxAxis: "", yxAxis: "", wkt: "" });
 const lastRequestSnapshot = ref("");
 
+// 地图展示参数
 const effectiveFilterParams = computed(() => ({
   ...props.filterParams,
   zxAxis: currentAxes.value.zxAxis,
@@ -48,18 +49,33 @@ const effectiveFilterParams = computed(() => ({
 }));
 
 const handleMapSelect = (payload) => {
-  currentAxes.value = payload || { zxAxis: "", yxAxis: "" };
+  currentAxes.value = payload || { zxAxis: "", yxAxis: "", wkt: "" };
+  if (currentAxes.value.wkt) {
+    emit('clear-area');
+  }
   fetchUnitList(1);
 };
 
 const fetchUnitList = async (pageNum = 1) => {
-  const params = {
-    pageNo: pageNum,
-    pageSize: 20,
-    ...effectiveFilterParams.value
+  // 构造新接口参数 (高性能模式)
+  const wktParams = {
+    ...props.filterParams,
+    wkt: currentAxes.value.wkt,
+    page: pageNum,
+    offset: 20 // 对应之前的 pageSize
   };
 
-  const currentSnapshot = JSON.stringify(params);
+  // 构造旧接口参数
+  const oldParams = {
+    ...props.filterParams,
+    zxAxis: currentAxes.value.zxAxis,
+    yxAxis: currentAxes.value.yxAxis,
+    pageNo: pageNum,
+    pageSize: 20
+  };
+
+  // 请求快照拦截：包含 wkt 变化判定
+  const currentSnapshot = JSON.stringify({ wkt: wktParams.wkt, zxAxis: oldParams.zxAxis, ...props.filterParams, pageNum });
   if (currentSnapshot === lastRequestSnapshot.value) {
     return; 
   }
@@ -68,7 +84,10 @@ const fetchUnitList = async (pageNum = 1) => {
   listLoading.value = true;
 
   try {
-    const res = await getUnitHeatMap(params);
+    // 调用分发器，类型设为 'list' 以指向 recordsV2 接口
+    const res = await fetchBusinessData(wktParams, oldParams, 'list');
+    
+    // 处理返回数据
     if (res?.data) {
       unitListData.value = {
         list: res.data.list || [],
@@ -83,6 +102,8 @@ const fetchUnitList = async (pageNum = 1) => {
     listLoading.value = false;
   }
 };
+
+const emit = defineEmits(['clear-area']);
 
 const handleRowClick = (row: any) => {
   selectedUnit.value = { ...row };

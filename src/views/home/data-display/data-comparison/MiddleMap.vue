@@ -28,7 +28,7 @@ const props = defineProps({
 
 const emit = defineEmits(['map-select', 'clear']);
 const mapView = ref<InstanceType<typeof MapView> | null>(null);
-const selectedGroups = ref<Array<{ zxAxis: string, yxAxis: string }>>([]);
+const selectedGroups = ref<Array<{ zxAxis: string, yxAxis: string, wkt: string }>>([]);
 
 const handleMapLoaded = async () => {
 };
@@ -45,7 +45,8 @@ const handleMapSelect = (payload: any) => {
   }
   selectedGroups.value.push({
     zxAxis: payload.zxAxis,
-    yxAxis: payload.yxAxis
+    yxAxis: payload.yxAxis,
+    wkt: payload.wkt 
   });
 
   message.success(`已添加区域 ${selectedGroups.value.length}`);

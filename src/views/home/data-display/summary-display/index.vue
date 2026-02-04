@@ -11,53 +11,58 @@ import { ref, onMounted, watch } from 'vue';
 import LeftPanel from './LeftPanel.vue';
 import MiddleMap from './MiddleMap.vue';
 import RightPanel from './RightPanel.vue';
-import { getGsSumDataDisplay } from '@/api/data-display';
-
+import { fetchBusinessData } from '@/api/data-display';
 
 const props = defineProps<{
   filterParams?: any;
 }>();
 
 const apiData = ref({});
-const currentAxes = ref({ zxAxis: "", yxAxis: "" });
+const currentAxes = ref({ zxAxis: "", yxAxis: "", wkt: "" });
 const lastRequestSnapshot = ref("");
 
 const fetchData = async (extraParams = {}) => {
-  const params = {
-    "zxAxis": currentAxes.value.zxAxis,
-    "yxAxis": currentAxes.value.yxAxis,
-    "area": "",
-    "industryDept": "",
-    "registerType": "",
-    "unitScale": "",
-    "businessOperationType": "",
-    "industryCategory": "",
-    "holdingSituation": "",
+
+  const wktParams = {
+    wkt: currentAxes.value.wkt,
+    ...extraParams 
+  };
+
+  const oldParams = {
+    zxAxis: currentAxes.value.zxAxis,
+    yxAxis: currentAxes.value.yxAxis,
     ...extraParams
   };
 
-  // 请求拦截：对比参数无变化则不重复请求
- const currentSnapshot = JSON.stringify(params);
+  // 请求拦截逻辑
+  const currentSnapshot = JSON.stringify({ wkt: wktParams.wkt, zxAxis: oldParams.zxAxis, ...extraParams });
   if (currentSnapshot === lastRequestSnapshot.value) return; 
   lastRequestSnapshot.value = currentSnapshot;
 
-try {
-    const res = await getGsSumDataDisplay(params);
-    if (res && res.data) apiData.value = res.data;
+  try {
+    const res = await fetchBusinessData(wktParams, oldParams, 'sum');
+    
+    if (res && res.data) {
+      apiData.value = res.data; 
+    }
   } catch (error) {
-    console.error('汇总接口请求失败:', error);
+    console.error('获取数据失败:', error);
   }
 };
 
+const emit = defineEmits(['clear-area']);
+
+// 处理地图选择事件
 const handleMapSelect = (payload) => {
-  currentAxes.value = payload || { zxAxis: "", yxAxis: "" };
+  currentAxes.value = payload || { zxAxis: "", yxAxis: "", wkt: "" };
+  if (currentAxes.value.wkt) {
+    emit('clear-area');
+  }
   fetchData(props.filterParams || {}); 
 };
-
+// 监听过滤参数变化
 watch(() => props.filterParams, (newVal) => {
-  if (newVal) {
-    fetchData(newVal);
-  }
+  fetchData(newVal || {});
 }, { deep: true });
 
 onMounted(() => {
@@ -76,13 +81,6 @@ onMounted(() => {
   align-items: stretch;
 }
 
-.right-panel {
-  min-width: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
-
 .left-panel {
   flex: 1;
   background: white;
@@ -96,5 +94,9 @@ onMounted(() => {
 .right-panel {
   flex: 1;
   background: white;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 </style>

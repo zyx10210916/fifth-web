@@ -22,13 +22,14 @@
 import { ref, shallowRef, onUnmounted } from 'vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
 import { mapQuery } from '@/utils/mapQuery';
+import { toMultiPolygonWKT } from '@/utils/mapUtils';
 
 export default {
   name: 'MapTools',
   props: {
     view: { type: Object, required: true },
     modules: { type: Object, required: true },
-    appendMode: { type: Boolean, default: false }
+    appendMode: { type: Boolean, default: false },
   },
   setup(props, { emit, expose }) {
     const activeTool = ref(null);
@@ -191,17 +192,21 @@ export default {
 
     // 高亮选中及发送查询逻辑
     const querySelectedPoints = async (geometry) => {
-      const { Graphic } = props.modules;
+      //  视觉高亮 
       const result = await mapQuery(geometry, props.modules);
-
-      if (!props.appendMode) {
-        measureLayer.value.removeAll();
-        measureLayer.value.add(new Graphic({
-          geometry, symbol: MAP_CONFIG.styles.selectionRect
-        }));
+      if (result.graphics) {
+        measureLayer.value.addMany(result.graphics); 
       }
-      measureLayer.value.addMany(result.graphics);
-      emit('map-select', { zxAxis: result.zxAxis, yxAxis: result.yxAxis });
+
+      // 使用转换函数获取 WKT 字符串
+      const wktStr = toMultiPolygonWKT(geometry, props.modules);
+
+      // 同时发出两套参数给接口
+      emit('map-select', { 
+        zxAxis: result.zxAxis, 
+        yxAxis: result.yxAxis, 
+        wkt: wktStr 
+      });
     };
 
     onUnmounted(() => { if (measureLayer.value) props.view.map.remove(measureLayer.value); });
