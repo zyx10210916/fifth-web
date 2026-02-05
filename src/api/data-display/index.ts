@@ -45,36 +45,71 @@ export const fetchBusinessData = async (wktParams: any, oldParams: any, type: 's
   if (IS_HIGH_PERFORMANCE.value && hasWkt) {
     const url = (type === 'sum' || type === 'comparison') ? URL.getWjpStatistics : URL.getWjpRecords;
     
-    // 构造高性能接口参数
+    // 处理 industryDept 的单引号包裹问题 (如 B -> 'B')
+    const deptValue = wktParams.industryDept || "";
+    const formattedDept = deptValue 
+      ? deptValue.split(',').map(v => `'${v.trim().replace(/'/g, "")}'`).join(',') 
+      : "";
+
+    // 处理 industryCategory 格式化 (如 F -> F 批发和零售业)
+    const categoryValue = wktParams.industryCategory || "";
+    let formattedCategory = "";
+    if (categoryValue) {
+      formattedCategory = categoryValue.split(',').map(val => {
+        const code = val.trim();
+        // 从 FILTER_MAP 中查找对应的中文名称
+        const entry = Object.entries(FILTER_MAP.industryCategory).find(([_, c]) => c === code);
+        return entry ? `'${entry[1]} ${entry[0]}'` : `'${code}'`;
+      }).join(',');
+    }
+
     const finalParams: any = {
       wkt: wktParams.wkt,
       area: "",
-      indestryCategory: wktParams.industryCategory || "", 
+      industryCategory: formattedCategory, // 使用格式化后的 "F 批发和零售业"
       businessOperationType: wktParams.businessOperationType || "",
       holdingSituation: wktParams.holdingSituation || "",
-      industryDept: wktParams.industryDept || "",
+      industryDept: formattedDept, // 使用包裹单引号后的 "'B'"
       registerType: wktParams.registerType || "",
       unitScale: wktParams.unitScale || "",
     };
 
+    // 热力图清单分页参数
+    if (type === 'list') {
+      finalParams.page = wktParams.page || 1;
+      finalParams.offset = wktParams.offset || 20;
+    }
+
     const res = await post<any>({ url, data: finalParams });
 
-    // --- 数据归一化与清洗逻辑 ---
+    // 处理热力图高性能接口返回结构映射 (recordsV2)
+    if (type === 'list' && res?.features) {
+      const { features } = res;
+      return {
+        success: true,
+        data: {
+          total: features.total_count || 0,
+          // 将 records 映射为 list，并处理字段名大小写转换以适配原有清单
+          list: (features.records || []).map((item: any) => {
+            const normalizedItem: any = {};
+            for (const key in item) {
+              normalizedItem[key.toUpperCase()] = item[key];
+              normalizedItem[key.toLowerCase()] = item[key];
+            }
+            return normalizedItem;
+          })
+        }
+      };
+    }
+
     if (res && !res.hasOwnProperty('data')) {
       const formattedData: any = { ...res };
 
-      // 处理 employmentPersomel 字段命名不一致问题
-      if (res.employmentPersomel) {
-        formattedData.employmentPersonnel = res.employmentPersomel;
-      }
-
-      // 行业部门的反向映射表 (Code -> Name)
       const deptCodeToName: Record<string, string> = {};
       Object.entries(FILTER_MAP.industryDept).forEach(([name, code]) => {
         deptCodeToName[code] = name;
       });
 
-      // 统一处理所有字段
       const arrayFields = [
         'legalPersonNumList', 
         'employmentPersonnel', 
@@ -86,15 +121,12 @@ export const fetchBusinessData = async (wktParams: any, oldParams: any, type: 's
       arrayFields.forEach(field => {
         if (formattedData[field] && Array.isArray(formattedData[field])) {
           formattedData[field] = formattedData[field]
-            .filter((item: any) => item.name !== 'total') // 忽略 total 统计项
+            .filter((item: any) => item.name !== 'total')
             .map((item: any) => {
               let finalName = item.name;
-
-              // 针对利润和资产情况，将代码(Code)转换为中文名称
               if (field === 'operatingProfit' || field === 'totalAssets') {
                 finalName = deptCodeToName[item.name] || item.name;
               }
-
               return {
                 name: finalName,
                 value: item.value
@@ -110,7 +142,6 @@ export const fetchBusinessData = async (wktParams: any, oldParams: any, type: 's
     }
     return res;
   } else {
-    // 旧接口逻辑分支
     let url = URL.getGsSumDataDisplay;
     if (type === 'comparison') url = URL.getDataComparison;
     if (type === 'list') url = URL.getUnitHeatMap;

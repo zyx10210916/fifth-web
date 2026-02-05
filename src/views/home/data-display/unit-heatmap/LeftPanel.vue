@@ -14,6 +14,15 @@
             <el-input v-model="fieldSearchText" placeholder="搜索字段名称" size="small" clearable />
           </div>
           <el-divider />
+          <div class="all-select-bar" style="margin-bottom: 10px; padding-left: 4px;">
+            <el-checkbox
+              v-model="isAllSelected"
+              :indeterminate="isIndeterminate"
+              @change="handleCheckAllChange"
+            >
+              全选
+            </el-checkbox>
+          </div>
           <div class="checkbox-list">
             <el-checkbox-group v-model="visibleFieldProps">
               <div v-for="field in filteredFields" :key="field.prop" class="field-item">
@@ -105,6 +114,41 @@ const activeColumns = computed(() => {
   return UNIT_COLUMNS.filter(col => visibleFieldProps.value.includes(col.prop));
 });
 
+const selectableProps = computed(() => 
+  UNIT_COLUMNS.filter(f => !f.fixed).map(f => f.prop)
+);
+
+// 判断是否全选的状态
+const isAllSelected = computed({
+  get() {
+    const selectedNonFixedCount = visibleFieldProps.value.filter(
+      p => !UNIT_COLUMNS.find(f => f.prop === p)?.fixed
+    ).length;
+    return selectedNonFixedCount === selectableProps.value.length && selectableProps.value.length > 0;
+  },
+  set(val: boolean) {
+    handleCheckAllChange(val);
+  }
+});
+
+// 设置半选状态
+const isIndeterminate = computed(() => {
+  const selectedNonFixedCount = visibleFieldProps.value.filter(
+    p => !UNIT_COLUMNS.find(f => f.prop === p)?.fixed
+  ).length;
+  return selectedNonFixedCount > 0 && selectedNonFixedCount < selectableProps.value.length;
+});
+
+// 处理全选切换逻辑
+const handleCheckAllChange = (val: boolean) => {
+  const fixedProps = UNIT_COLUMNS.filter(f => f.fixed).map(f => f.prop);
+  if (val) {
+    visibleFieldProps.value = [...fixedProps, ...selectableProps.value];
+  } else {
+    visibleFieldProps.value = fixedProps;
+  }
+};
+
 // --- 分页逻辑 ---
 const currentPage = ref(1);
 
@@ -161,6 +205,17 @@ const handlePageChange = (page: number) => {
     }
   }
 
+  .all-select-bar {
+    border-bottom: 1px dashed #ebeef5;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    
+    :deep(.el-checkbox__label) {
+      font-weight: bold;
+      color: #409eff;
+    }
+  }
+  
   .table-content {
     flex: 1;
     padding: 12px;

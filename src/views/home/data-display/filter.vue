@@ -164,26 +164,32 @@ function toggle(list: string[], code: string) {
 function scrollToSection(index: number) {
   activeCategory.value = index;
   const target = document.getElementById(`section-${index}`);
-  if (target && scrollContainer.value) {
-    scrollContainer.value.scrollTo({
-      top: target.offsetTop - 10,
+  const container = scrollContainer.value;
+
+  if (target && container) {
+    container.scrollTo({
+      top: target.offsetTop, 
       behavior: 'smooth'
     });
   }
 }
  
 function onScroll() {
-  if (!scrollContainer.value) return;
-  const containerTop = scrollContainer.value.getBoundingClientRect().top;
+  const container = scrollContainer.value;
+  if (!container) return;
+
+  const scrollTop = container.scrollTop;
+  let currentActive = 0;
+
   for (let i = 0; i < categories.length; i++) {
     const section = document.getElementById(`section-${i}`);
     if (section) {
-      const rect = section.getBoundingClientRect();
-      if (rect.top - containerTop <= 60) {
-        activeCategory.value = i;
+      if (scrollTop >= section.offsetTop - 10) {
+        currentActive = i;
       }
     }
   }
+  activeCategory.value = currentActive;
 }
  
 function clearAll() {
@@ -302,6 +308,7 @@ function closeModal() {
   padding: 0 30px;
   overflow-y: auto;
   scroll-behavior: smooth;
+  position: relative; 
 }
 
 .filter-section {
