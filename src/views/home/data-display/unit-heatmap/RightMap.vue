@@ -36,11 +36,11 @@ const highlightUnit = async (unit: any) => {
   let posY = parseFloat(unit.YZ_AXIS || unit.yz_axis);
   let finalUnitData = { ...unit };
 
-  // 高性能模式处理：如果没有坐标，则通过 WYM 关联普通接口获取点位
+  // 高性能模式处理：如果没有坐标，则通过 b109 关联普通接口获取点位
   if (isNaN(posX) || isNaN(posY)) {
     try {
       const res = await getUnitHeatMap({ 
-        wym: unit.WYM || unit.wym, 
+        uniqueCode: unit.B109 || unit.b109, 
         pageSize: 1, 
         pageNo: 1 
       });
@@ -55,7 +55,7 @@ const highlightUnit = async (unit: any) => {
         return;
       }
     } catch (error) {
-      console.error("异步补全单位坐标失败:", error);
+      console.error("补全单位坐标失败:", error);
       return;
     }
   }
@@ -91,7 +91,7 @@ const highlightUnit = async (unit: any) => {
     view.goTo({ target: pointGeometry, zoom: 16 });
 
   } catch (error) {
-    console.error("RightMap 高亮执行失败:", error);
+    console.error("RightMap高亮执行失败:", error);
   }
 };
 

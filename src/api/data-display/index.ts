@@ -13,7 +13,6 @@ const URL = {
   // 原有接口 (普通模式)
   getGsSumDataDisplay: '/api/api-form/form/fifth/gs/getGsSumDataDisplay',
   getDataComparison: '/api/api-form/form/fifth/gs/getDataComparison',
-  getBulletinList: '/api/api-form/form/fifth/gs/getBulletinList',
   getUnitHeatMap: '/api/api-form/form/fifth/gs/getUnitHeatMap',
   getUniqueCodeList: '/api/api-form/form/fifth/gs/getUniqueCodeList',
   
@@ -25,7 +24,6 @@ const URL = {
 // --- 基础请求封装 ---
 export const getGsSumDataDisplay = (data: any) => post<any>({ url: URL.getGsSumDataDisplay, data, headers: { 'needToken_': 'true' } });
 export const getDataComparison = (data: any) => post<any>({ url: URL.getDataComparison, data, headers: { 'needToken_': 'true' } });
-export const getBulletinList = (data: any) => post<any>({ url: URL.getBulletinList, data, headers: { 'needToken_': 'true' } });
 export const getUnitHeatMap = (data: any) => post<any>({ url: URL.getUnitHeatMap, data, headers: { 'needToken_': 'true' } });
 export const getUniqueCodeList = (data: any) =>post<any>({ url: URL.getUniqueCodeList, data, headers: { 'needToken_': 'true' } });
 

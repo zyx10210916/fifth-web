@@ -19,7 +19,7 @@ export const UNIT_COLUMNS: FieldColumn[] = [
   // 地址与联系方式
   { label: '街（路）门牌号', prop: 'B1056' },
   { label: '区划代码', prop: 'B1057' },
-  { label: '联系电话', prop: 'A0003' },
+  // { label: '联系电话', prop: 'A0003' },
   
   // 经营状态与行业
   { label: '运营状态', prop: 'B208' },

@@ -24,7 +24,7 @@ export function mapPopup(view: any, modules: any) {
           zxAxis: data.zxAxis, 
           yxAxis: data.yxAxis, 
           pageNo: 1, 
-          pageSize: 100 
+          pageSize: 2500 
         });
         units = res?.data?.list || [];
       } catch (error) {

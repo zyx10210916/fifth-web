@@ -107,7 +107,7 @@ const getBarOption = (rawData: any, dataKey: string, use3D: boolean): any => {
       return {
         name: reg,
         type: 'bar',
-        barMaxWidth: 16,
+        barMaxWidth: 18,
         data: categories.map(cat => regionMap.get(cat) || 0),
         itemStyle: {
           borderRadius: [4, 4, 0, 0],

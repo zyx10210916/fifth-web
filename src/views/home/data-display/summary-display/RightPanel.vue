@@ -64,10 +64,10 @@ const getBarOption = (data: any[], use3D: boolean): any => {
     return {
       grid: { top: '15%', left: '3%', right: '3%', bottom: '5%', containLabel: true },
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: names, axisLabel: { interval: 0, rotate: 35 } },
+      xAxis: { type: 'category', data: names, axisLabel: { interval: 0, rotate: 45 } },
       yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
       series: [{
-        type: 'bar', barWidth: '40%', data: values,
+        type: 'bar', barWidth: '50%', data: values,
         itemStyle: {
           borderRadius: [4, 4, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -117,7 +117,7 @@ const getBarOption = (data: any[], use3D: boolean): any => {
       splitLine: { show: true } 
     },
     grid3D: {
-      boxWidth: 160,
+      boxWidth: 120,
       boxHeight: 90,
       boxDepth: 20,
       viewControl: { 

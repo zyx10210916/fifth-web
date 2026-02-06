@@ -73,7 +73,7 @@ const fetchData = async (extraParams = {}) => {
 const handleClear = () => {
   activeComparisonList.value = [];
 };
- 
+
 // 处理开始多对比事件
 const handleStartComparison = async (axisList: any[]) => {
   if (!axisList || axisList.length < 2) return;

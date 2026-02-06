@@ -191,8 +191,7 @@ export default {
 
         const map = new Map({
           basemap: new Basemap({
-            // baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
-            baseLayers: null,
+            baseLayers: [new TileLayer({ url: MAP_CONFIG.basemaps.street })],
             id: "street"
           })
         });
@@ -209,7 +208,7 @@ export default {
           await nextTick();
 
           // 边界加载
-          // await loadBoundaryLayers(map);
+          await loadBoundaryLayers(map);
 
           view.value.on("click", handleMapClick);
           emit('map-loaded', { view: view.value, map, modules: mapModules.value });
@@ -221,169 +220,6 @@ export default {
 
 
     //--- 处理地图点击事件 ---//
-    // const handleMapClick = async (event) => {
-    //   if (mapToolsRef.value && mapToolsRef.value.isWorking) {
-    //     return;
-    //   }
-
-    //   if (!view.value || !mapModules.value) return;
-    //   const { Graphic } = mapModules.value;
-
-    //   const hitTest = await view.value.hitTest(event);
-    //   const priorityIds = ["building", "house", "town", "district"];
-    //   let bestFit = null;
-
-    //   for (const id of priorityIds) {
-    //     const isVisible = layersState.value[id]?.visible ?? true;
-    //     if (isVisible) {
-    //       const hit = hitTest.results.find(r => r.graphic?.layer?.id === id);
-    //       if (hit) {
-    //         bestFit = hit.graphic;
-    //         break;
-    //       }
-    //     }
-    //   }
-
-    //   if (bestFit) {
-    //     if (!props.appendMode) view.value.graphics.removeAll();
-
-    //     // 防御性处理：防止 attributes 为 null
-    //     const attrs = bestFit.attributes || {};
-    //     const layerId = bestFit.layer.id;
-    //     let result;
-
-    //     if (layerId === 'building') {
-    //       // 提取“坐标”字段
-    //       const coordStr = attrs["坐标"] || "";
-    //       const [zx, yx] = coordStr.split(',').map(s => s.trim());
-
-    //       // 点高亮
-    //       view.value.graphics.add(new Graphic({
-    //         geometry: bestFit.geometry,
-    //         symbol: MAP_CONFIG.styles.highlightPoint
-    //       }));
-
-    //       // 调用弹窗方法
-    //       if (zx && yx) {
-    //         await showPopup({ zxAxis: zx, yxAxis: yx }, event.mapPoint, true);
-    //       }
-
-    //       // 点查询
-    //       result = await mapQuery(bestFit.geometry, mapModules.value, { zxAxis: zx, yxAxis: yx });
-    //     } else {
-    //       // 面查询
-    //       view.value.graphics.add(new Graphic({
-    //         geometry: bestFit.geometry,
-    //         symbol: MAP_CONFIG.styles.highlightPolygon
-    //       }));
-    //       result = await mapQuery(bestFit.geometry, mapModules.value);
-    //     }
-
-    //     if (result.graphics) view.value.graphics.addMany(result.graphics);
-    //     emit('map-select', { zxAxis: result.zxAxis, yxAxis: result.yxAxis });
-    //   } else {
-    //     // 非追加模式，点击空白处清空
-    //     if (!props.appendMode) {
-    //       view.value.graphics.removeAll();
-    //       view.value.popup.close();
-    //       emit('map-select', { zxAxis: "", yxAxis: "" });
-    //     }
-    //   }
-    // };
-
-    //  const handleMapClick = async (event) => {
-    //     if (mapToolsRef.value && mapToolsRef.value.isWorking) return;
-    //     if (!view.value || !mapModules.value) return;
-
-    //     const { Graphic, Extent, geometryEngine } = mapModules.value;
-
-    //     // --- 阶段 1：点选探测 (优先判断) ---
-    //     if (layersState.value.building.visible) {
-    //       const tolerance = view.value.resolution * 5; 
-    //       const searchExtent = new Extent({
-    //         xmin: event.mapPoint.x - tolerance,
-    //         ymin: event.mapPoint.y - tolerance,
-    //         xmax: event.mapPoint.x + tolerance,
-    //         ymax: event.mapPoint.y + tolerance,
-    //         spatialReference: view.value.spatialReference
-    //       });
-
-    //       const pointResult = await mapQuery(searchExtent, mapModules.value);
-
-    //       if (pointResult.graphics && pointResult.graphics.length > 0) {
-    //         // 非追加模式下清空旧高亮
-    //         if (!props.appendMode) view.value.graphics.removeAll();
-
-    //         let targetGraphic = null;
-    //         if (pointResult.graphics.length === 1) {
-    //           targetGraphic = pointResult.graphics[0];
-    //         } else {
-    //           let minDistance = Infinity;
-    //           pointResult.graphics.forEach((g) => {
-    //             const dist = geometryEngine.distance(event.mapPoint, g.geometry);
-    //             if (dist < minDistance) {
-    //               minDistance = dist;
-    //               targetGraphic = g;
-    //             }
-    //           });
-    //         }
-
-    //         // 【核心检查点】：从 attributes 提取坐标
-    //         const attrs = targetGraphic.attributes || {};
-    //         const coordStr = attrs["坐标"] || "";
-
-    //         // 只有在确定拿到坐标字符串时才执行后续逻辑
-    //         if (coordStr && coordStr.includes(',')) {
-    //           const [zx, yx] = coordStr.split(',').map(s => s.trim());
-
-    //           // 1. 视觉响应：高亮最近的点
-    //           view.value.graphics.add(targetGraphic);
-
-    //           // 2. 接口响应 A：弹出信息窗（内部通常会调用单位详情/热力图接口）
-    //           await showPopup({ zxAxis: zx, yxAxis: yx }, event.mapPoint, true);
-
-    //           // 3. 接口响应 B：向外通知坐标改变（由父组件触发 getsumdatadisplay 汇总接口）
-    //           emit('map-select', { zxAxis: zx, yxAxis: yx });
-
-    //           return; // 成功点中点，不再执行后续面选逻辑
-    //         }
-    //       }
-    //     }
-
-    //     // --- 阶段 2：面选探测 (若没点中点，则判断是否点中面) ---
-    //     const hitTest = await view.value.hitTest(event);
-    //     const polygonIds = ["house", "town", "district"];
-    //     // 在命中的结果中寻找行政区或房屋面，且该图层必须是可见的
-    //     const hitPolygon = hitTest.results.find(r => {
-    //       const id = r.graphic?.layer?.id;
-    //       return polygonIds.includes(id) && (layersState.value[id]?.visible ?? true);
-    //     });
-
-    //     if (hitPolygon) {
-    //       const bestFit = hitPolygon.graphic;
-    //       if (!props.appendMode) view.value.graphics.removeAll();
-
-    //       // 高亮被选中的面边界
-    //       view.value.graphics.add(new Graphic({
-    //         geometry: bestFit.geometry,
-    //         symbol: MAP_CONFIG.styles.highlightPolygon
-    //       }));
-
-    //       // 执行面查询：获取该面几何范围内所有的点
-    //       const polyResult = await mapQuery(bestFit.geometry, mapModules.value);
-    //       if (polyResult.graphics) view.value.graphics.addMany(polyResult.graphics);
-
-    //       emit('map-select', { zxAxis: polyResult.zxAxis, yxAxis: polyResult.yxAxis });
-    //     } else {
-    //       // --- 阶段 3：空白区域 (清空) ---
-    //       if (!props.appendMode) {
-    //         view.value.graphics.removeAll();
-    //         view.value.popup.close();
-    //         emit('map-select', { zxAxis: "", yxAxis: "" });
-    //       }
-    //     }
-    //   };
-
     const handleMapClick = async (event) => {
   if (mapToolsRef.value && mapToolsRef.value.isWorking) return;
   if (!view.value || !mapModules.value) return;

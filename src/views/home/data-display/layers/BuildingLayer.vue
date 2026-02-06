@@ -30,7 +30,7 @@ export default {
         }],
         customParameters: {
           "TRANSPARENT": "true",
-          "VERSION": bldCfg.wmsVersion,
+          "VERSION": '1.1.0',
           "SRS": "EPSG:4526"
         },
         visible: props.visible

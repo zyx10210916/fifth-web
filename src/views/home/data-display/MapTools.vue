@@ -23,6 +23,7 @@ import { ref, shallowRef, onUnmounted } from 'vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
 import { mapQuery } from '@/utils/mapQuery';
 import { toMultiPolygonWKT } from '@/utils/mapUtils';
+import { IS_HIGH_PERFORMANCE } from '@/api/data-display';
 
 export default {
   name: 'MapTools',
@@ -202,7 +203,7 @@ export default {
         mapQuery(geometry, props.modules).then(result => {
           // 视觉响应：添加红点高亮
           if (result.graphics) {
-            if (!props.appendMode) measureLayer.value.removeAll();
+            // if (!props.appendMode) measureLayer.value.removeAll();
             measureLayer.value.addMany(result.graphics); 
           }
 
@@ -218,7 +219,7 @@ export default {
         const result = await mapQuery(geometry, props.modules);
         
         if (result.graphics) {
-          if (!props.appendMode) measureLayer.value.removeAll();
+          // if (!props.appendMode) measureLayer.value.removeAll();
           measureLayer.value.addMany(result.graphics); 
         }
 
