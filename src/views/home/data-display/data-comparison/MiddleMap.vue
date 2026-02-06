@@ -34,19 +34,32 @@ const handleMapLoaded = async () => {
 };
 
 const handleMapSelect = (payload: any) => {
-  if (!payload || (!payload.zxAxis && !payload.yxAxis)) return;
-  const isDuplicate = selectedGroups.value.some(
-    group => group.zxAxis === payload.zxAxis && group.yxAxis === payload.yxAxis
-  );
+  if (!payload || (!payload.wkt && !payload.zxAxis && !payload.yxAxis)) return;
+  if (payload._isUpdate) {
+    const target = selectedGroups.value.find(group => group.wkt === payload.wkt);
+    if (target) {
+      target.zxAxis = payload.zxAxis;
+      target.yxAxis = payload.yxAxis;
+    }
+    return;
+  }
+
+  const isDuplicate = selectedGroups.value.some(group => {
+    if (payload.wkt && group.wkt) {
+      return group.wkt === payload.wkt;
+    }
+    return group.zxAxis === payload.zxAxis && group.yxAxis === payload.yxAxis;
+  });
 
   if (isDuplicate) {
     message.info('该区域已在比对清单中');
     return;
   }
+
   selectedGroups.value.push({
-    zxAxis: payload.zxAxis,
-    yxAxis: payload.yxAxis,
-    wkt: payload.wkt 
+    zxAxis: payload.zxAxis || "",
+    yxAxis: payload.yxAxis || "",
+    wkt: payload.wkt || ""
   });
 
   message.success(`已添加区域 ${selectedGroups.value.length}`);

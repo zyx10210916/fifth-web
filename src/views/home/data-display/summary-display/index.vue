@@ -54,17 +54,16 @@ const emit = defineEmits(['clear-area']);
 
 // 处理地图选择事件
 const handleMapSelect = (payload) => {
-  currentAxes.value = payload || { zxAxis: "", yxAxis: "", wkt: "" };
-  
-  // 如果子组件已经并行取回了数据，直接赋值
-  if (payload.data) {
-    apiData.value = payload.data;
-    // 记得更新快照，防止 watch 里的逻辑重复请求
-    lastRequestSnapshot.value = JSON.stringify({ wkt: payload.wkt, ...props.filterParams });
-  } else {
-    fetchData(props.filterParams || {}); 
+  if (payload.isUpdate && apiData.value && currentAxes.value.wkt === payload.wkt) {
+    currentAxes.value.zxAxis = payload.zxAxis;
+    currentAxes.value.yxAxis = payload.yxAxis;
+    return;
   }
+
+  currentAxes.value = payload || { zxAxis: "", yxAxis: "", wkt: "" };
+  fetchData(props.filterParams || {}); 
 };
+
 // 监听过滤参数变化
 watch(() => props.filterParams, (newVal) => {
   fetchData(newVal || {});

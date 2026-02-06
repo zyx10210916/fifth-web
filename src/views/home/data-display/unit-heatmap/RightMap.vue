@@ -12,6 +12,7 @@ import { ref, shallowRef, watch } from 'vue';
 import MapView from '../MapView.vue';
 import { MAP_CONFIG } from '@/config/mapConfig';
 import { mapPopup } from '@/hooks/mapPopup';
+import { getUnitHeatMap } from '@/api/data-display'; 
 
 const props = defineProps<{
   selectedUnit?: any;
@@ -26,17 +27,44 @@ const mapModules = shallowRef<any>(null);
 const highlightRef = shallowRef<any>(null);
 const { showPopup } = mapPopup(mapView, mapModules);
 
-// 高亮选中单位
-const highlightUnit = (unit: any) => {
-  const posX = parseFloat(unit.XZ_AXIS);
-  const posY = parseFloat(unit.YZ_AXIS);
+//高亮选中逻辑
+const highlightUnit = async (unit: any) => {
+  if (!unit || !mapView.value || !mapModules.value) return;
 
-  if (!unit || isNaN(posX) || isNaN(posY) || !mapView.value || !mapModules.value) return;
+  // 获取坐标数据
+  let posX = parseFloat(unit.XZ_AXIS || unit.xz_axis);
+  let posY = parseFloat(unit.YZ_AXIS || unit.yz_axis);
+  let finalUnitData = { ...unit };
 
+  // 高性能模式处理：如果没有坐标，则通过 WYM 关联普通接口获取点位
+  if (isNaN(posX) || isNaN(posY)) {
+    try {
+      const res = await getUnitHeatMap({ 
+        wym: unit.WYM || unit.wym, 
+        pageSize: 1, 
+        pageNo: 1 
+      });
+
+      if (res?.success && res?.data?.list?.length > 0) {
+        const detail = res.data.list[0];
+        posX = parseFloat(detail.XZ_AXIS);
+        posY = parseFloat(detail.YZ_AXIS);
+        finalUnitData = { ...detail };
+      } else {
+        console.warn('该单位未找到对应的空间坐标点');
+        return;
+      }
+    } catch (error) {
+      console.error("异步补全单位坐标失败:", error);
+      return;
+    }
+  }
+
+  // 执行地图渲染逻辑
   try {
     const { Graphic } = mapModules.value;
     const view: any = mapView.value.getMapView();
-    if (!view) return;
+    if (!view || isNaN(posX) || isNaN(posY)) return;
 
     // 清除旧高亮
     if (highlightRef.value) {
@@ -50,19 +78,16 @@ const highlightUnit = (unit: any) => {
       spatialReference: MAP_CONFIG.initialExtent.spatialReference
     };
 
-    // 使用配置中统一的 highlightPoint 样式
     const highlightGraphic = new Graphic({
       geometry: pointGeometry,
       symbol: MAP_CONFIG.styles.highlightPoint,
-      attributes: unit
+      attributes: finalUnitData
     });
 
     view.graphics.add(highlightGraphic);
     highlightRef.value = highlightGraphic;
 
-    // 弹出信息窗
-    showPopup(unit, pointGeometry, false);
-    
+    showPopup(finalUnitData, pointGeometry, false);
     view.goTo({ target: pointGeometry, zoom: 16 });
 
   } catch (error) {
@@ -79,6 +104,8 @@ const handleMapSelect = (payload: any) => {
 };
 
 watch(() => props.selectedUnit, (unit) => {
-  if (unit) highlightUnit(unit);
-});
+  if (unit) {
+    highlightUnit(unit);
+  }
+}, { deep: true });
 </script>

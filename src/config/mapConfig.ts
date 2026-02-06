@@ -6,16 +6,19 @@ import dtActive from "@/assets/images/dt-2.png";
 import yxtNormal from "@/assets/images/yxt-1.png";
 import yxtActive from "@/assets/images/yxt-2.png";
 
+//从环境变量读取值
+const GEOSERVER_BASE = import.meta.env.VITE_GEOSERVER_BASE;
+const MAP_WS = import.meta.env.VITE_MAP_WORKSPACE;
+const ARCGIS_BASE = import.meta.env.VITE_ARCGIS_BASE;
 
-const GEOSERVER_BASE = "http://10.44.58.28:8089/geoserver/workspace";
-// const GEOSERVER_BASE = "http://192.168.10.123:8089/geoserver/dataCenterWorkspace";
-const BuildingLayer_Name = "workspace:juheshujupc38";
-const HouseLayer_Name = "workspace:WJPFWMpc38";
-const HeatMapLayer_Name = "workspace:yuwangshuju";
+//图层名
+const BuildingLayer_Name = `${MAP_WS}:juheshujupc38`;
+const HouseLayer_Name = `${MAP_WS}:WJPFWMpc38`;
+const HeatMapLayer_Name = `${MAP_WS}:yuwangshuju`;
 
 
 /**
- * 统一 WFS URL 构造器
+ * WFS URL 构造
  * @param typeName 图层名
  * @param options 可选参数：bbox(空间过滤), propertyName(属性过滤)
  */
@@ -38,10 +41,8 @@ const createWfsUrl = (typeName: string, options: { bbox?: string, propertyName?:
 export const MAP_CONFIG = {
   // ArcGIS API 基础配置
   arcgis: {
-    js: "http://10.44.58.28:8000/4.19/init.js",
-    css: "http://10.44.58.28:8000/4.19/esri/themes/light/main.css"
-    // js: "http://192.168.94.114/4.19/init.js",
-    // css: "http://192.168.94.114/4.19/esri/themes/light/main.css"
+    js: `${ARCGIS_BASE}/init.js`,
+    css: `${ARCGIS_BASE}/esri/themes/light/main.css`
 
   },
 
@@ -78,11 +79,11 @@ export const MAP_CONFIG = {
     building: {
       id: "building",
       layerName: BuildingLayer_Name,
-      //  BBOX 查询（拉框和面点选查询）
+      //  BBOX 请求（拉框和面点选查询）
       bboxUrl: (bbox: string) => createWfsUrl(BuildingLayer_Name, { bbox }),
-      // wfs查询
+      // wfs请求
       url: createWfsUrl(BuildingLayer_Name, { propertyName: "the_geom,坐标" }),
-      // wms查询
+      // wms请求
       wmsUrl: `${GEOSERVER_BASE}/wms`,
       wmsVersion: "1.1.0"
     },
@@ -143,8 +144,8 @@ export const MAP_CONFIG = {
 
   // 底图服务配置
   basemaps: {
-    street: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/0dd2d428919f40818617fdf05492aaff/DataServer",
-    satellite: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/1e8f0689c7f84b3581bf98449ed8e700/DataServer"
+    street: import.meta.env.VITE_MAP_BASEMAP_STREET,
+    satellite: import.meta.env.VITE_MAP_BASEMAP_SATELLITE,
   },
 
   // 底图切换 UI 配置
@@ -155,10 +156,20 @@ export const MAP_CONFIG = {
   
   // 行政边界图层配置
   boundary: {
-    baseUrl: "https://ypt.gzlpc.gov.cn/apiway/api-service/encrypt/rest/services/2baabbc53f404e7a96f9f9da3ec0ec68/DataServer",
+    baseUrl: import.meta.env.VITE_BOUNDARY_BASE_URL, 
     layers: {
-      district: { layerId: 2, title: "区县行政边界", defaultVisible: true, outlineColor: [70, 130, 180, 0.8] },
-      town: { layerId: 3, title: "街镇行政边界", defaultVisible: false, outlineColor: [210, 105, 30, 0.8] }
+      district: { 
+        layerId: 2, 
+        title: "区县行政边界", 
+        defaultVisible: true, 
+        outlineColor: [70, 130, 180, 0.8] 
+      },
+      town: { 
+        layerId: 3, 
+        title: "街镇行政边界", 
+        defaultVisible: false, 
+        outlineColor: [210, 105, 30, 0.8] 
+      }
     }
   }
 };

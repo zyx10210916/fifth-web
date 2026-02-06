@@ -192,21 +192,43 @@ export default {
 
     // 高亮选中及发送查询逻辑
     const querySelectedPoints = async (geometry) => {
-      //  视觉高亮 
-      const result = await mapQuery(geometry, props.modules);
-      if (result.graphics) {
-        measureLayer.value.addMany(result.graphics); 
-      }
-
-      // 使用转换函数获取 WKT 字符串
       const wktStr = toMultiPolygonWKT(geometry, props.modules);
 
-      // 同时发出两套参数给接口
-      emit('map-select', { 
-        zxAxis: result.zxAxis, 
-        yxAxis: result.yxAxis, 
-        wkt: wktStr 
-      });
+      if (IS_HIGH_PERFORMANCE.value) {
+        emit('map-select', { 
+          wkt: wktStr 
+        });
+
+        mapQuery(geometry, props.modules).then(result => {
+          // 视觉响应：添加红点高亮
+          if (result.graphics) {
+            if (!props.appendMode) measureLayer.value.removeAll();
+            measureLayer.value.addMany(result.graphics); 
+          }
+
+          emit('map-select', { 
+            wkt: wktStr,
+            zxAxis: result.zxAxis, 
+            yxAxis: result.yxAxis,
+            _isUpdate: true 
+          });
+        });
+
+      } else {
+        const result = await mapQuery(geometry, props.modules);
+        
+        if (result.graphics) {
+          if (!props.appendMode) measureLayer.value.removeAll();
+          measureLayer.value.addMany(result.graphics); 
+        }
+
+        // 同时发出所有参数
+        emit('map-select', { 
+          zxAxis: result.zxAxis, 
+          yxAxis: result.yxAxis, 
+          wkt: wktStr 
+        });
+      }
     };
 
     onUnmounted(() => { if (measureLayer.value) props.view.map.remove(measureLayer.value); });

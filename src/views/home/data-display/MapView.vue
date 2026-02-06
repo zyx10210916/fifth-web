@@ -385,76 +385,97 @@ export default {
     //   };
 
     const handleMapClick = async (event) => {
-      if (mapToolsRef.value && mapToolsRef.value.isWorking) return;
-      if (!view.value || !mapModules.value) return;
+  if (mapToolsRef.value && mapToolsRef.value.isWorking) return;
+  if (!view.value || !mapModules.value) return;
 
-      const { Graphic, Extent } = mapModules.value;
+  const { Graphic, Extent } = mapModules.value;
 
-      // --- 1. 点选探测 ---
-      if (layersState.value.building.visible) {
-        const tolerance = view.value.resolution * 5; 
-        const searchExtent = new Extent({
-          xmin: event.mapPoint.x - tolerance, ymin: event.mapPoint.y - tolerance,
-          xmax: event.mapPoint.x + tolerance, ymax: event.mapPoint.y + tolerance,
-          spatialReference: view.value.spatialReference
-        });
+  // --- 点选探测 (Building 点图层) ---
+  if (layersState.value.building.visible) {
+    const tolerance = view.value.resolution * 5; 
+    const searchExtent = new Extent({
+      xmin: event.mapPoint.x - tolerance, ymin: event.mapPoint.y - tolerance,
+      xmax: event.mapPoint.x + tolerance, ymax: event.mapPoint.y + tolerance,
+      spatialReference: view.value.spatialReference
+    });
+    const pointResult = await mapQuery(searchExtent, mapModules.value);
 
-        const pointResult = await mapQuery(searchExtent, mapModules.value);
-
-        if (pointResult.graphics?.length > 0) {
-          if (!props.appendMode) view.value.graphics.removeAll();
-          let targetGraphic = pointResult.graphics[0]; // 简化距离判定
-          const attrs = targetGraphic.attributes || {};
-          const coordStr = attrs["坐标"] || "";
-          
-          if (coordStr.includes(',')) {
-            const [zx, yx] = coordStr.split(',').map(s => s.trim());
-            view.value.graphics.add(targetGraphic);
-            await showPopup({ zxAxis: zx, yxAxis: yx }, event.mapPoint, true);
-            
-            // 发送点选范围 WKT。只要这个 wkt 传给 index.vue 存起来，后续属性查询也会带上它
-            emit('map-select', { 
-              zxAxis: zx, yxAxis: yx, 
-              wkt: toMultiPolygonWKT(targetGraphic.geometry) 
-            });
-            return; 
-          }
-        }
-      }
-
-      // --- 2. 面选探测 ---
-      const hitTest = await view.value.hitTest(event);
-      const hitPolygon = hitTest.results.find(r => ["house", "town", "district"].includes(r.graphic?.layer?.id));
-
-      if (hitPolygon) {
-        const bestFit = hitPolygon.graphic;
+    if (pointResult.graphics?.length > 0) {
+      let targetGraphic = pointResult.graphics[0];
+      const attrs = targetGraphic.attributes || {};
+      const coordStr = attrs["坐标"] || "";
+      
+      if (coordStr.includes(',')) {
+        const [zx, yx] = coordStr.split(',').map(s => s.trim());
+        const wktStr = toMultiPolygonWKT(targetGraphic.geometry);
+        
         if (!props.appendMode) view.value.graphics.removeAll();
-
-        view.value.graphics.add(new Graphic({
-          geometry: bestFit.geometry,
-          symbol: MAP_CONFIG.styles.highlightPolygon
-        }));
-
-        // 视觉反馈红点点
-        const polyResult = await mapQuery(bestFit.geometry, mapModules.value);
-        if (polyResult.graphics) view.value.graphics.addMany(polyResult.graphics);
-
-        // 发送面范围 WKT。只要不点空白，业务组件 currentAxes 里的这个 wkt 就会一直存在
+        view.value.graphics.add(targetGraphic);
+        showPopup({ zxAxis: zx, yxAxis: yx }, event.mapPoint, true); 
         emit('map-select', { 
+          zxAxis: zx, yxAxis: yx, 
+          wkt: wktStr 
+        });
+        return; 
+      }
+    }
+  }
+
+  // --- 面选探测 (行政区、房屋面图层) ---
+  const hitTest = await view.value.hitTest(event);
+  const hitPolygon = hitTest.results.find(r => ["house", "town", "district"].includes(r.graphic?.layer?.id));
+
+  if (hitPolygon) {
+    const bestFit = hitPolygon.graphic;
+    const wktStr = toMultiPolygonWKT(bestFit.geometry); // 立即生成面选 WKT
+
+    if (IS_HIGH_PERFORMANCE.value) {
+      emit('map-select', { wkt: wktStr });
+
+      // 视觉响应：高亮选中的面边界
+      if (!props.appendMode) view.value.graphics.removeAll();
+      view.value.graphics.add(new Graphic({
+        geometry: bestFit.geometry,
+        symbol: MAP_CONFIG.styles.highlightPolygon
+      }));
+
+      // 异步补充：查询面内的红点并更新坐标状态
+      mapQuery(bestFit.geometry, mapModules.value).then(polyResult => {
+        if (polyResult.graphics) view.value.graphics.addMany(polyResult.graphics);
+        // 异步补齐坐标参数，不触发重新请求
+        emit('map-select', { 
+          wkt: wktStr,
           zxAxis: polyResult.zxAxis, 
           yxAxis: polyResult.yxAxis,
-          wkt: toMultiPolygonWKT(bestFit.geometry) 
+          _isUpdate: true 
         });
-      } else {
-        // --- 3. 关键：点击空白区域 (解除空间锁定) ---
-        if (!props.appendMode) {
-          view.value.graphics.removeAll();
-          view.value.popup.close();
-          // 向外发送空 wkt，此时分发器会自动切回旧接口执行属性查询
-          emit('map-select', { zxAxis: "", yxAxis: "", wkt: "" });
-        }
-      }
-    };
+      });
+
+    } else {
+      const polyResult = await mapQuery(bestFit.geometry, mapModules.value);
+      if (!props.appendMode) view.value.graphics.removeAll();
+
+      view.value.graphics.add(new Graphic({
+        geometry: bestFit.geometry,
+        symbol: MAP_CONFIG.styles.highlightPolygon
+      }));
+      if (polyResult.graphics) view.value.graphics.addMany(polyResult.graphics);
+
+      emit('map-select', { 
+        zxAxis: polyResult.zxAxis, 
+        yxAxis: polyResult.yxAxis,
+        wkt: wktStr 
+      });
+    }
+  } else {
+    // --- 空白区域 (清空) ---
+    if (!props.appendMode) {
+      view.value.graphics.removeAll();
+      view.value.popup.close();
+      emit('map-select', { zxAxis: "", yxAxis: "", wkt: "" });
+    }
+  }
+};
 
     const handleBasemapChange = (id) => {
       const { Basemap, TileLayer } = mapModules.value;

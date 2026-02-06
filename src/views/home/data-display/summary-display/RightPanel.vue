@@ -57,7 +57,7 @@ const is3D = reactive({ asset: false, profit: false });
 const getBarOption = (data: any[], use3D: boolean): any => {
   const names = data.map(item => item.name);
   const values = data.map(item => item.value);
-  const blueColor = '#4a82e8';
+  const colors = ['#85e1ff', '#009dff'];
 
   if (!use3D) {
     // 2D 
@@ -68,7 +68,13 @@ const getBarOption = (data: any[], use3D: boolean): any => {
       yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
       series: [{
         type: 'bar', barWidth: '40%', data: values,
-        itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#6ea1f4' }, { offset: 1, color: blueColor }]) }
+        itemStyle: {
+          borderRadius: [4, 4, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: colors[0] }, 
+            { offset: 1, color: colors[1] }  
+          ])
+        }
       }]
     };
   }
@@ -129,7 +135,10 @@ const getBarOption = (data: any[], use3D: boolean): any => {
       data: values.map((val, idx) => [idx, 0, val]),
       shading: 'lambert',
       label: { show: false },
-      itemStyle: { color: blueColor },
+      itemStyle: { 
+        color: colors[1], 
+        opacity: 0.95 
+      },
     }]
   };
 };

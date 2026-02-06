@@ -12,7 +12,6 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
-import { message } from 'ant-design-vue';
 import LeftPanel from './LeftPanel.vue';
 import MiddleMap from './MiddleMap.vue';
 import RightPanel from './RightPanel.vue';
@@ -30,7 +29,7 @@ const hasUserFilter = computed(() => props.filterParams && Object.keys(props.fil
 
 // 获取数据方法
 const fetchData = async (extraParams = {}) => {
-  // 1. 如果当前有选区数组且不是清空状态，则继续走高性能比对
+  // 如果当前有选区数组且不是清空状态，则继续走高性能比对
   if (activeComparisonList.value.length >= 2) {
     handleStartComparison(activeComparisonList.value);
     return;
@@ -55,7 +54,7 @@ const fetchData = async (extraParams = {}) => {
 
     const oldParams = { uniqueCode: "", ...baseParams, ...extraParams };
 
-    // 2. 核心逻辑：此时 wkt 为空，fetchBusinessData 内部会自动切换到旧接口 (getDataComparison)
+    //此时 wkt 为空，fetchBusinessData 内部会自动切换到旧接口 (getDataComparison)
     const res = await fetchBusinessData({ wkt: "" }, oldParams, 'comparison');
 
     if (res && res.data) {
@@ -74,51 +73,60 @@ const fetchData = async (extraParams = {}) => {
 const handleClear = () => {
   activeComparisonList.value = [];
 };
-
-// 处理开始多区域对比事件
+ 
+// 处理开始多对比事件
 const handleStartComparison = async (axisList: any[]) => {
-  if (!axisList || axisList.length < 2) {
-    message.warn("请选择至少两个区域进行对比");
-    return;
-  }
+  if (!axisList || axisList.length < 2) return;
   emit('clear-area');
   activeComparisonList.value = axisList;
 
   try {
-    // 并行发起多个高性能请求
-    const requests = axisList.map((item, index) => {
-      const regionName = item.name || `区域 ${index + 1}`;
+    // 发起试探请求：使用第一个选区，并带上普通接口所需的 axisDtos
+    const firstItem = axisList[0];
+    const oldComparisonParams = {
+      axisDtos: axisList, 
+      area: "", 
+      ...props.filterParams
+    };
+
+    const firstRes = await fetchBusinessData(
+      { wkt: firstItem.wkt, ...props.filterParams },
+      oldComparisonParams,
+      'comparison'
+    );
+
+    // 根据标记进行逻辑分发
+    if (firstRes._isHP === false) {
+      // 情况 A：开关关闭或报错回退。返回的是普通接口计算好的全量对比数据
+      apiData.value = firstRes.data || firstRes;
+      console.log('检测到旧接口回退或开关关闭，已渲染全量对比数据');
+    } else {
+      // 情况 B：高性能模式正常。返回的是第一个区域的数据，需并行请求剩下的区域
+      console.log('高性能模式运行中，开始并行请求剩余区域数据');
       
-      const wktParams = {
-        wkt: item.wkt, 
-        area: "",
-        ...props.filterParams 
-      };
+      const requests = axisList.map(async (item, index) => {
+        const regionName = item.name || `区域 ${index + 1}`;
+        
+        // 第一个区域直接用试探请求的结果，不再重复发包
+        if (index === 0) {
+          return { name: regionName, data: firstRes.data };
+        }
 
-      const oldParams = {
-        zxAxis: item.zxAxis,
-        yxAxis: item.yxAxis,
-        ...props.filterParams
-      };
-      
-      return fetchBusinessData(wktParams, oldParams, 'comparison')
-        .then(res => ({
-          name: regionName,
-          data: res.data || res 
-        }));
-    });
+        const wktParams = { wkt: item.wkt, ...props.filterParams };
+        const oldParams = { zxAxis: item.zxAxis, yxAxis: item.yxAxis, ...props.filterParams };
+        
+        const singleRes = await fetchBusinessData(wktParams, oldParams, 'comparison');
+        return { name: regionName, data: singleRes.data || singleRes };
+      });
 
-    const results = await Promise.all(requests);
-    const comparisonMap = results.reduce((acc, cur) => {
-      acc[cur.name] = cur.data;
-      return acc;
-    }, {} as any);
-
-    apiData.value = comparisonMap;
-
+      const results = await Promise.all(requests);
+      apiData.value = results.reduce((acc, cur) => {
+        acc[cur.name] = cur.data;
+        return acc;
+      }, {} as any);
+    }
   } catch (error) {
-    console.error('高性能比对请求失败:', error);
-    message.error("数据加载失败，请检查网络");
+    console.error('比对流程异常:', error);
   }
 };
 
