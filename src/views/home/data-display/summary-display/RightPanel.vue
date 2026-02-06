@@ -2,8 +2,14 @@
   <aside class="right">
     <div class="item-box">
       <div class="head">
-        <span>资产情况</span>
-        <span class="total-badge">{{ (totalAssetsSum / 10000).toFixed(2) }} 万元</span>
+        <span class="title">资产情况</span>
+        <div class="head-right">
+          <el-radio-group v-model="is3D.asset" size="small" @change="processData" class="view-switch">
+            <el-radio-button :label="false">2D</el-radio-button>
+            <el-radio-button :label="true">3D</el-radio-button>
+          </el-radio-group>
+          <span class="total-badge">{{ (totalAssetsSum / 10000).toFixed(2) }} 万元</span>
+        </div>
       </div>
       <div class="content">
         <div class="unit-tip">单位：万元</div>
@@ -13,8 +19,14 @@
     
     <div class="item-box">
       <div class="head">
-        <span>营业利润</span>
-        <span class="total-badge">{{ (totalProfitSum / 10000).toFixed(2) }} 万元</span>
+        <span class="title">营业利润</span>
+        <div class="head-right">
+          <el-radio-group v-model="is3D.profit" size="small" @change="processData" class="view-switch">
+            <el-radio-button :label="false">2D</el-radio-button>
+            <el-radio-button :label="true">3D</el-radio-button>
+          </el-radio-group>
+          <span class="total-badge">{{ (totalProfitSum / 10000).toFixed(2) }} 万元</span>
+        </div>
       </div>
       <div class="content">
         <div class="unit-tip">单位：万元</div>
@@ -26,8 +38,8 @@
 
 <script setup lang="ts">
 import * as echarts from 'echarts';
-import { ref, watch, onMounted, onUnmounted, nextTick} from 'vue';
-import type { EChartsOption } from 'echarts'; 
+import 'echarts-gl';
+import { ref, watch, onMounted, onUnmounted, nextTick, reactive } from 'vue';
 
 const props = defineProps({
   summaryData: { type: Object, default: () => ({}) }
@@ -40,88 +52,112 @@ let profitChart: echarts.ECharts | null = null;
 
 const totalAssetsSum = ref(0);
 const totalProfitSum = ref(0);
+const is3D = reactive({ asset: false, profit: false });
 
-const getBarOption = (data: any[]): EChartsOption => ({
-  grid: {
-    top: '8%',
-    left: '3%',
-    right: '3%',
-    bottom: '0',
-    containLabel: true
-  },
-  tooltip: {
-    trigger: 'axis',
-    axisPointer: { type: 'shadow' },
-    backgroundColor: 'rgba(50, 50, 50, 0.7)',
-    textStyle: { color: '#fff', fontSize: 16 },
-    formatter: (params: any) => {
-      const item = params[0];
-      return `${item.name}<br/><span style="display:inline-block;margin-right:5px;border-radius:50%;width:10px;height:10px;background-color:${item.color.colorStops[0].color};"></span>数值: ${item.value}`;
-    }
-  },
-  xAxis: {
-    type: 'category',
-    data: data.map(item => item.name),
-    axisLine: { lineStyle: { color: '#eee' } },
-    axisTick: { show: false },
-    axisLabel: { 
-      fontSize: 14, 
-      color: '#666',
-      interval: 0,
-      rotate: 60, 
-      formatter: (val: string) => val.length > 20 ? val.slice(0, 20) + '...' : val
-    }
-  },
-  yAxis: {
-    type: 'value',
-    splitLine: { lineStyle: { type: 'dashed', color: '#f0f0f0' } },
-    axisLabel: { fontSize: 14, color: '#999' }
-  },
-  series: [{
-    type: 'bar',
-    barWidth: '40%',
-    data: data.map(item => item.value),
-    itemStyle: {
-      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-        { offset: 0, color: '#ffb570' },
-        { offset: 1, color: '#ff8800' } 
-      ]),
-      borderRadius: [4, 4, 0, 0]
-    }
-  }]
-});
+const getBarOption = (data: any[], use3D: boolean): any => {
+  const names = data.map(item => item.name);
+  const values = data.map(item => item.value);
+  const blueColor = '#4a82e8';
+
+  if (!use3D) {
+    // 2D 
+    return {
+      grid: { top: '15%', left: '3%', right: '3%', bottom: '5%', containLabel: true },
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: names, axisLabel: { interval: 0, rotate: 35 } },
+      yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed' } } },
+      series: [{
+        type: 'bar', barWidth: '40%', data: values,
+        itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#6ea1f4' }, { offset: 1, color: blueColor }]) }
+      }]
+    };
+  }
+
+  // ---  3D 部分 ---
+  return {
+    tooltip: { 
+      trigger: 'item',
+      formatter: (params: any) => {
+        const index = params.data[0];
+        const name = names[index];
+        const value = params.data[2];
+        return `${name} : ${value} 万元`;
+      }
+    },
+    xAxis3D: { 
+      type: 'category', 
+      data: names, 
+      name: '',
+      axisLabel: { 
+        show: true,
+        margin: 25, 
+        rotate: 45,
+        textStyle: { color: '#333', fontSize: 12, backgroundColor: 'transparent' },
+        interval: 0 ,
+        align:'left'
+      },
+      axisLine: { lineStyle: { color: '#666' } }
+    },
+    yAxis3D: { 
+      type: 'category', 
+      data: [''], 
+      name: '',
+      axisLine: { lineStyle: { color: 'transparent' } } 
+    },
+    zAxis3D: { 
+      type: 'value', 
+      name: '',
+      axisLabel: { margin: 40 },
+      splitLine: { show: true } 
+    },
+    grid3D: {
+      boxWidth: 160,
+      boxHeight: 90,
+      boxDepth: 20,
+      viewControl: { 
+        alpha: 10, 
+        beta: 35, 
+        distance: 180,
+        center: [0,0,0],
+        projection: 'perspective' 
+      },
+      bottom: '5%',
+      top:'-10%'
+    },
+    series: [{
+      type: 'bar3D',
+      data: values.map((val, idx) => [idx, 0, val]),
+      shading: 'lambert',
+      label: { show: false },
+      itemStyle: { color: blueColor },
+    }]
+  };
+};
 
 const processData = () => {
   const res = props.summaryData;
-  if (!res || Object.keys(res).length === 0) return;
+  if (!res || !Object.keys(res).length) return;
 
-  nextTick(()=>{
-  // 处理资产情况
-  if (res.totalAssets && Array.isArray(res.totalAssets)) {
-    const assetsData = res.totalAssets.map((item: any) => ({
-      name: item.name,
-      value: (Number(item.value) / 10000).toFixed(2)
-    }));
-    totalAssetsSum.value = res.totalAssets.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
-    assetChart?.setOption(getBarOption(assetsData));
-  }
+  nextTick(() => {
+    if (res.totalAssets) {
+      const assetsData = res.totalAssets.map((item: any) => ({
+        name: item.name, value: (Number(item.value) / 10000).toFixed(2)
+      }));
+      totalAssetsSum.value = res.totalAssets.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
+      assetChart?.setOption(getBarOption(assetsData, is3D.asset), true);
+    }
 
-  //处理营业利润
-  if (res.operatingProfit && Array.isArray(res.operatingProfit)) {
-    const profitData = res.operatingProfit.map((item: any) => ({
-      name: item.name,
-      value: (Number(item.value) / 10000).toFixed(2)
-    }));
-    totalProfitSum.value = res.operatingProfit.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
-    profitChart?.setOption(getBarOption(profitData));
-  }
+    if (res.operatingProfit) {
+      const profitData = res.operatingProfit.map((item: any) => ({
+        name: item.name, value: (Number(item.value) / 10000).toFixed(2)
+      }));
+      totalProfitSum.value = res.operatingProfit.reduce((acc: number, cur: any) => acc + Number(cur.value), 0);
+      profitChart?.setOption(getBarOption(profitData, is3D.profit), true);
+    }
   });
 };
 
-const handleResize = () =>{
-  assetChart?.resize();
-  profitChart?.resize();
-}
+const handleResize = () => { assetChart?.resize(); profitChart?.resize(); };
 
 onMounted(() => {
   nextTick(() => {
@@ -134,15 +170,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
-  
-  if (assetChart) {
-    assetChart.dispose();
-    assetChart = null;
-  }
-  if (profitChart) {
-    profitChart.dispose();
-    profitChart = null;
-  }
+  assetChart?.dispose(); profitChart?.dispose();
 });
 
 watch(() => props.summaryData, processData, { deep: true });
@@ -157,6 +185,7 @@ watch(() => props.summaryData, processData, { deep: true });
   border-radius: 6px;
   box-sizing: border-box;
   background-color: white;
+  gap:0;
 }
 
 .item-box {
@@ -175,7 +204,28 @@ watch(() => props.summaryData, processData, { deep: true });
   font-size: 18px;
   font-weight: bold;
   color: #333;
-  padding: 10px 12px;
+  padding: 12px 16px;
+  height: 54px;
+  box-sizing: border-box;
+}
+
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.view-switch {
+  display: flex;
+  align-items: center;
+}
+
+.view-switch :deep(.el-radio-button__inner) {
+  padding: 5px 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  height: 28px;
 }
 
 .total-badge {
@@ -183,8 +233,12 @@ watch(() => props.summaryData, processData, { deep: true });
   font-weight: normal;
   background-color: #f5f5f5;
   color: #666;
-  padding: 4px 12px;
-  border-radius: 18px;
+  padding: 0 12px;
+  border-radius: 20px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  line-height: 1;
 }
 
 .content {
@@ -205,6 +259,6 @@ watch(() => props.summaryData, processData, { deep: true });
 .chart-container {
   width: 100%;
   height: 100%;
-  min-height: 200px;
+  min-height: 250px;
 }
 </style>
